@@ -11,6 +11,7 @@ const UserSchema = mongoose.Schema({
     Aadhar_url:String , 
     License_url:String,
     created_at: { type: Date, default: Date.now },
+    joined_pools:[String],
     updated_at: { type: Date, default: Date.now }
 })
 

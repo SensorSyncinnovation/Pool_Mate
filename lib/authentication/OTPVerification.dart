@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:pool_mate/ride/selection.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../Constants.dart'; // Import the constants file
 
@@ -24,7 +25,7 @@ class PhoneVerificationScreen extends StatelessWidget {
         body: jsonEncode({'email': email, 'otp': otp}),
         headers: {'Content-Type': 'application/json'},
       );
-      print(response);
+      print(response.body);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
@@ -32,16 +33,34 @@ class PhoneVerificationScreen extends StatelessWidget {
           // Store the token in secure storage
           final token = data['token'];
           await _secureStorage.write(key: 'jwt_token', value: token);
-
+          var email = data['email'];
+          var phonenumber = data['phoneNumber'];
+          var isdriver = data['isDriver'];
+          // Retrieve and print the token from secure storage
+          final storedToken = await _secureStorage.read(key: 'jwt_token');
+          print('Stored JWT Token: $storedToken'); // Print the token
+          print('$isdriver isdriver');
           // Navigate to the next screen on success
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => TermsAndConditionsPage(
-                 email: email, 
+          if (isdriver == true) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => RidePage(
+                      email: email,
+                      phoneNumber: phoneNumber,
+                      isdriver: isdriver)),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => TermsAndConditionsPage(
+                  email: email,
+                  phoneNumber: phonenumber,
+                ),
               ),
-            ),
-          );
+            );
+          }
         } else {
           print(response.body);
           // Show error message
@@ -60,9 +79,8 @@ class PhoneVerificationScreen extends StatelessWidget {
           );
         }
       } else {
-           print(response);
+        print(response);
         throw Exception(
-          
             'Failed to verify OTP. Status code: ${response.statusCode}');
       }
     } catch (e) {

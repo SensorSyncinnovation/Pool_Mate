@@ -15,7 +15,7 @@ class LoginScreen extends StatelessWidget {
 
     if (response.statusCode == 200) {
       final user = jsonDecode(response.body);
-      userProvider.setUser(user['userId'], user['phoneNumber']);
+      userProvider.setUser(user['userId'], user['phoneNumber'] , user['email']);
       Navigator.pushNamed(context, '/home'); // Navigate to the home screen
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

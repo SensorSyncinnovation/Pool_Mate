@@ -7,8 +7,11 @@ import 'package:pool_mate/ride/selection.dart';
 
 class TermsAndConditionsPage extends StatefulWidget {
   final String email;
+  final String phoneNumber;
 
-  const TermsAndConditionsPage({Key? key, required this.email}) : super(key: key);
+  const TermsAndConditionsPage(
+      {Key? key, required this.email, required this.phoneNumber})
+      : super(key: key);
 
   @override
   _TermsAndConditionsPageState createState() => _TermsAndConditionsPageState();
@@ -19,124 +22,136 @@ class _TermsAndConditionsPageState extends State<TermsAndConditionsPage> {
   String? licenseFileName;
   bool isAgreed = false;
 
-Future<void> pickFile(Function(String) onFilePicked) async {
-  try {
-    // Allow image files (png, jpg, jpeg)
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.image,  // This will allow only image files
-    );
-    if (result != null) {
-      // Get the absolute path of the selected file
-      String? filePath = result.files.single.path;
+  Future<void> pickFile(Function(String) onFilePicked) async {
+    try {
+      // Allow image files (png, jpg, jpeg)
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.image, // This will allow only image files
+      );
+      if (result != null) {
+        // Get the absolute path of the selected file
+        String? filePath = result.files.single.path;
 
-      if (filePath != null) {
-        onFilePicked(filePath);
-      } else {
-        throw Exception("Failed to get the file path.");
+        if (filePath != null) {
+          onFilePicked(filePath);
+        } else {
+          throw Exception("Failed to get the file path.");
+        }
       }
-    }
-  } catch (e) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Error'),
-        content: Text('Failed to pick file: $e'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-Future<void> uploadFiles() async {
-  print('Aadhaar File Path: $aadhaarFileName');
-  print('License File Path: $licenseFileName');
-
-  if (aadhaarFileName == null || licenseFileName == null || !isAgreed) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Error'),
-        content: const Text('Please upload all files and agree to the terms.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-    return;
-  }
-
-  try {
-    final url = Uri.parse('${APIConstants.baseUrl}/license');
-
-    var request = http.MultipartRequest('POST', url);
-    request.fields['email'] = widget.email;
-
-    // Attach files
-    if (aadhaarFileName != null) {
-      request.files.add(await http.MultipartFile.fromPath(
-        'aadhaar',
-        aadhaarFileName!,
-      ));
-    }
-    if (licenseFileName != null) {
-      request.files.add(await http.MultipartFile.fromPath(
-        'license',
-        licenseFileName!,
-      ));
-    }
-
-    var response = await request.send();
-    debugPrint('Response: $response', wrapWidth: 1024);
-    if (response.statusCode == 200) {
-      // Show success dialog and redirect
+    } catch (e) {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Success'),
-          content: const Text('Files uploaded successfully!'),
+          title: const Text('Error'),
+          content: Text('Failed to pick file: $e'),
           actions: [
             TextButton(
-              onPressed: () {
-                // Close the dialog
-                Navigator.pop(context);
-                // Redirect to RidePage
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => RidePage()),
-                );
-              },
+              onPressed: () => Navigator.pop(context),
               child: const Text('OK'),
             ),
           ],
         ),
       );
-    } else {
-      throw Exception('Failed to upload files. Status code: ${response.statusCode}');
     }
-  } catch (e) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Error'),
-        content: Text(e.toString()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
   }
-}
+
+  Future<void> uploadFiles() async {
+    print('Aadhaar File Path: $aadhaarFileName');
+    print('License File Path: $licenseFileName');
+
+    if (aadhaarFileName == null || licenseFileName == null || !isAgreed) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Error'),
+          content:
+              const Text('Please upload all files and agree to the terms.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    try {
+      final url = Uri.parse('${APIConstants.baseUrl}/license');
+
+      var request = http.MultipartRequest('POST', url);
+      request.fields['email'] = widget.email;
+
+      // Attach files
+      if (aadhaarFileName != null) {
+        request.files.add(await http.MultipartFile.fromPath(
+          'aadhaar',
+          aadhaarFileName!,
+        ));
+      }
+      if (licenseFileName != null) {
+        request.files.add(await http.MultipartFile.fromPath(
+          'license',
+          licenseFileName!,
+        ));
+      }
+
+      var response = await request.send();
+      debugPrint('Response: $response', wrapWidth: 1024);
+      if (response.statusCode == 200) {
+        var responseBody = await response.stream.bytesToString();
+        var data = jsonDecode(responseBody);
+
+        var email = data['data']['email'];
+        var phone = data['data']['phone'];
+        var isdriver = data['data']['isDriver'];
+        // Show success dialog and redirect
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Success'),
+            content: const Text('Files uploaded successfully!'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  // Close the dialog
+                  Navigator.pop(context);
+                  // Redirect to RidePage
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => RidePage(
+                            email: email,
+                            phoneNumber: phone,
+                            isdriver: isdriver)),
+                  );
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        throw Exception(
+            'Failed to upload files. Status code: ${response.statusCode}');
+      }
+    } catch (e) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Error'),
+          content: Text(e.toString()),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -163,9 +178,9 @@ Future<void> uploadFiles() async {
                 ),
               ),
               const SizedBox(height: 24),
-              Text(
+              const Text(
                 'Upload Aadhaar Card',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               GestureDetector(
@@ -190,9 +205,9 @@ Future<void> uploadFiles() async {
                 ),
               ),
               const SizedBox(height: 16),
-              Text(
+              const Text(
                 'Upload Driver\'s License',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               GestureDetector(
@@ -217,6 +232,11 @@ Future<void> uploadFiles() async {
                 ),
               ),
               const SizedBox(height: 24),
+              const Text(
+                'Upload documents only if you want to offer a ride. If not, you can proceed directly to the RidePage.',
+                style: TextStyle(fontSize: 14, color: Colors.black54),
+              ),
+              const SizedBox(height: 24),
               Row(
                 children: [
                   Checkbox(
@@ -230,7 +250,8 @@ Future<void> uploadFiles() async {
                   const Expanded(
                     child: Text(
                       'I have read and agree to the Terms and Conditions',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                      style:
+                          TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                     ),
                   ),
                 ],
@@ -252,13 +273,28 @@ Future<void> uploadFiles() async {
                     ),
                   ),
                   ElevatedButton(
-                    onPressed: uploadFiles,
+                    onPressed: () {
+                      if (aadhaarFileName == null && licenseFileName == null) {
+                        // Proceed directly to the RidePage if no files are uploaded
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => RidePage(
+                                  email: widget.email,
+                                  phoneNumber: widget.phoneNumber,
+                                  isdriver: false)),
+                        );
+                      } else {
+                        uploadFiles();
+                      }
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.black,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 12),
                     ),
                     child: const Text(
                       'Agree',

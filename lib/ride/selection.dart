@@ -1,12 +1,21 @@
 import 'dart:convert';
-
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:pool_mate/authentication/OTPVerification.dart';
 import 'package:flutter/material.dart';
+import 'package:pool_mate/authentication/PhoneNumber.dart';
 import 'package:pool_mate/ride/Find.dart';
 import 'package:http/http.dart' as http;
 import 'package:pool_mate/ride/myPools.dart';
 import 'package:uuid/uuid.dart';
+import '../Constants.dart';
 
 class RidePage extends StatefulWidget {
+  final String email;
+  final String phoneNumber;
+  final bool isdriver;
+  RidePage(
+      {required this.email, required this.phoneNumber, required this.isdriver});
+
   @override
   _RidePageState createState() => _RidePageState();
 }
@@ -16,10 +25,12 @@ class _RidePageState extends State<RidePage> {
   String? _selectedDestination;
   String? _selectedSeats;
   String? _selectedStartTime;
+  final TextEditingController _costController = TextEditingController();
+  final FlutterSecureStorage secureStorage = FlutterSecureStorage();
+  bool _isLoading = false;
 
-  List<String> _sourcelocation = [];
-  List<String> _destinationlocation = [];
-
+  final List<String> _sourcelocation = ['Tada', 'IIITS', 'Sulluepeta'];
+  final List<String> _destinationlocation = ['Tada', 'IIITS', 'Sulluepeta'];
   final List<String> _seatOptions = ['1', '2', '3', '4', '5'];
   final List<String> _startTimes = [
     '10:00 AM',
@@ -31,53 +42,10 @@ class _RidePageState extends State<RidePage> {
   @override
   void initState() {
     super.initState();
-    fetchSources();
-    fetchDestinations(); // Fetch destinations when widget is initialized
-  }
-
-  Future<void> fetchSources() async {
-    const String apiUrl = 'http://10.0.52.146:3000/sources';
-
-    try {
-      final response = await http.get(Uri.parse(apiUrl));
-
-      if (response.statusCode == 200) {
-        // Parse the response body
-        List<dynamic> data = json.decode(response.body);
-
-        // Convert to a List<String>
-        setState(() {
-          _sourcelocation = List<String>.from(data);
-        });
-      } else {
-        print('Failed to load sources: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Error fetching sources: $e');
-    }
-  }
-
-  Future<void> fetchDestinations() async {
-    const String apiUrl =
-        'http://10.0.52.146:3000/destinations';
-
-    try {
-      final response = await http.get(Uri.parse(apiUrl));
-
-      if (response.statusCode == 200) {
-        // Parse the response body
-        List<dynamic> data = json.decode(response.body);
-
-        // Convert to a List<String>
-        setState(() {
-          _destinationlocation = List<String>.from(data);
-        });
-      } else {
-        print('Failed to load destinations: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Error fetching destinations: $e');
-    }
+    _selectedSource = null;
+    _selectedDestination = null;
+    _selectedSeats = null;
+    _selectedStartTime = null;
   }
 
   bool isFindRide = false;
@@ -86,6 +54,15 @@ class _RidePageState extends State<RidePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: Text("Ride Page"),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.exit_to_app),
+            onPressed: () => _logOut(context),
+          ),
+        ],
+      ),
       body: Stack(
         children: [
           // Dummy Map Container
@@ -115,7 +92,7 @@ class _RidePageState extends State<RidePage> {
               backgroundColor: Colors.white,
               child: IconButton(
                 icon: Icon(Icons.menu, color: Colors.black),
-                onPressed: () {},
+                onPressed: () => _logOut(context),
               ),
             ),
           ),
@@ -127,11 +104,13 @@ class _RidePageState extends State<RidePage> {
               child: IconButton(
                 icon: Icon(Icons.search, color: Colors.black),
                 onPressed: () {
-                    Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => MyPools(driverId: '1',)),
-                        );
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => MyPools(
+                              email: widget.email,
+                        )),
+                  );
                 },
               ),
             ),
@@ -232,22 +211,71 @@ class _RidePageState extends State<RidePage> {
                     // Add the Join button here
                     SizedBox(height: 20.0),
                     ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => ListOfAvailablePools()),
-                        );
-                      },
+                      onPressed: _isLoading
+                          ? null
+                          : () async {
+                              if (_selectedSource == null || _selectedDestination == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Please select both source and destination')),
+                                );
+                                return;
+                              }
+                              setState(() => _isLoading = true);
+                              try {
+                                var body = json.encode({
+                                  'pickupLocation': _selectedSource,
+                                  'dropoffLocation': _selectedDestination,
+                                });
+
+                                final response = await http.post(
+                                  Uri.parse('${APIConstants.baseUrl}/findride'),
+                                  headers: {'Content-Type': 'application/json'},
+                                  body: body,
+                                );
+                                print(response.body);
+                                if (response.statusCode == 200) {
+                                  final rides = json.decode(response.body);
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => ListOfAvailablePools(
+                                        availableRides: rides,
+                                        userEmail: widget.email,
+                                        userPhone: widget.phoneNumber,
+                                      ),
+                                    ),
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Failed to find rides')),
+                                  );
+                                }
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Error: $e')),
+                                );
+                              } finally {
+                                setState(() => _isLoading = false);
+                              }
+                            },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black, // Customize button color
+                        backgroundColor: Colors.black,
                         foregroundColor: Colors.white,
-                        minimumSize: Size(200, 50), // Set button size
+                        minimumSize: Size(200, 50),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10.0),
                         ),
                       ),
-                      child: Text('SEARCH'),
+                      child: _isLoading
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text('SEARCH'),
                     ),
                   ],
 
@@ -300,98 +328,100 @@ class _RidePageState extends State<RidePage> {
                       },
                       icon: Icons.access_time,
                     ),
+                    SizedBox(height: 10.0),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(10.0),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 5.0,
+                            spreadRadius: 2.0,
+                          ),
+                        ],
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                        child: TextFormField(
+                          controller: _costController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            border: InputBorder.none,
+                            prefixIcon: Icon(Icons.currency_rupee, color: Colors.black),
+                            hintText: 'Enter Cost Per Person',
+                          ),
+                        ),
+                      ),
+                    ),
                     SizedBox(height: 20.0),
                     // Add the Join button here
                     ElevatedButton(
-                      onPressed: () async {
-                        // Generate a unique carPoolId
-                        var uuid = Uuid();
-                        String carPoolId =
-                            uuid.v4(); // Generate unique id for car pool
+                      onPressed: _isLoading
+                          ? null
+                          : () async {
+                              setState(() => _isLoading = true);
+                              try {
+                                var body = json.encode({
+                                  'pickupLocation': _selectedSource,
+                                  'dropoffLocation': _selectedDestination,
+                                  'startTime': _selectedStartTime,
+                                  'cost': int.tryParse(_costController.text) ?? 0,
+                                  'seats_available': _selectedSeats,
+                                  'driver_phone': widget.phoneNumber,
+                                  'driver_email': widget.email,
+                                });
 
-                        // Get the current time for start time and updatedAt
-                        DateTime now = DateTime.now();
-                        String startTime =
-                            now.toIso8601String(); // Format as ISO8601 string
-                        String updatedAt = startTime; // Same as start time
-
-                        // Prepare the payload for the POST request
-                        var body = json.encode({
-                          'carPoolId': carPoolId,
-                          'source': _selectedSource,
-                          'destination': _selectedDestination,
-                          'seats': _selectedSeats,
-                          'startTime': startTime,
-                          'driverId':
-                              1, // Assuming driverId is 1 as per your request
-                          'chatRoomId':
-                              carPoolId, // Use the same ID for chatRoomId
-                          'createdAt': startTime,
-                          'updatedAt': updatedAt,
-                        });
-
-                        // Make the HTTP POST request
-                        try {
-                          final response = await http.post(
-                            Uri.parse('http://192.168.129.42:3000/pool'),
-                            headers: {'Content-Type': 'application/json'},
-                            body: body,
-                          );
-
-                          // Check if the response is successful
-                          if (response.statusCode == 201) {
-                            // Success, handle the response as needed
-                            print(
-                                'Car pool created successfully: ${response.body}');
-                          } else {
-                            // Error handling
-                            print(
-                                'Failed to create car pool: ${response.body}');
-                          }
-                        } catch (e) {
-                          print('Error: $e');
-                        }
-
-                        // Show the confirmation dialog
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: Text("Confirm Ride Details"),
-                            content: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text("Source: $_selectedSource"),
-                                Text("Destination: $_selectedDestination"),
-                                Text("Seats: $_selectedSeats"),
-                                Text("Start Time: $startTime"),
-                              ],
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                },
-                                child: Text("Cancel"),
-                              ),
-                              ElevatedButton(
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                },
-                                child: Text("Confirm"),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
+                                final response = await http.post(
+                                  Uri.parse('${APIConstants.baseUrl}/rides'),
+                                  headers: {'Content-Type': 'application/json'},
+                                  body: body,
+                                );
+                                print(response.body);
+                                if (response.statusCode == 201) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                        content: Text(
+                                            'Car pool created successfully')),
+                                  );
+                                  print(
+                                      'Car pool created successfully: ${response.body}');
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                        content:
+                                            Text('Failed to create car pool')),
+                                  );
+                                  print('Failed to create car pool');
+                                }
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Error: $e')),
+                                );
+                                print('Error: $e');
+                              } finally {
+                                setState(() => _isLoading = false);
+                              }
+                            },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black, // Customize button color
+                        backgroundColor: Colors.black,
                         foregroundColor: Colors.white,
-                        minimumSize: Size(200, 50), // Set button size
+                        minimumSize: Size(200, 50),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10.0),
                         ),
                       ),
-                      child: Text('CREATE'),
+                      child: _isLoading
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text('Offer Ride'),
                     ),
                   ],
                 ],
@@ -410,25 +440,38 @@ class _RidePageState extends State<RidePage> {
     required ValueChanged<String?> onChanged,
     required IconData icon,
   }) {
-    return DropdownButtonFormField<String>(
-      value: value,
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: Colors.grey[200],
-        prefixIcon: Icon(icon, color: Colors.black),
-        hintText: hint,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20.0),
-          borderSide: BorderSide.none,
-        ),
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(10.0),
       ),
-      items: items.map((item) {
-        return DropdownMenuItem<String>(
-          value: item,
-          child: Text(item),
-        );
-      }).toList(),
-      onChanged: onChanged,
+      child: DropdownButton<String>(
+        value: value,
+        hint: Text(hint),
+        isExpanded: true,
+        underline: Container(), // Remove the default underline
+        items: items.map<DropdownMenuItem<String>>((String item) {
+          return DropdownMenuItem<String>(
+            value: item,
+            child: Text(item),
+          );
+        }).toList(),
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  void _logOut(BuildContext context) async {
+    // Delete the token from secure storage
+    await secureStorage.delete(key: 'jwt_token');
+
+    // Navigate to SignUpPage with email and phone number
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SignUpScreen(),
+      ),
     );
   }
 }

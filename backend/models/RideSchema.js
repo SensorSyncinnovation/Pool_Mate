@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 
 const RideSchema = mongoose.Schema({
     driver:String,
+    driver_phone:String,
+    driver_email:String,
     passengers: [{
         id:String,
         name: String,
@@ -10,9 +12,11 @@ const RideSchema = mongoose.Schema({
     }],
     pickupLocation: String,
     dropoffLocation: String,
-    startTime: Date,
-    endTime: Date,
+    startTime: String,
+    endTime: String,
     distance: Number,
     cost: Number,
-    seats_availabe: Number,
+    seats_available: Number,
 })
+
+module.exports = mongoose.model('Ride', RideSchema);

@@ -1,9 +1,73 @@
 import 'package:flutter/material.dart';
-
-class JoinedPoolsPage extends StatelessWidget {
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../Constants.dart';
+class JoinedPoolsPage extends StatefulWidget {
   final List<dynamic> joinedPools;
+  final String userEmail;
+  final String userPhone;
 
-  JoinedPoolsPage({required this.joinedPools});
+  JoinedPoolsPage({
+    required this.joinedPools,
+    required this.userEmail,
+    required this.userPhone,
+  });
+
+  @override
+  _JoinedPoolsPageState createState() => _JoinedPoolsPageState();
+}
+
+class _JoinedPoolsPageState extends State<JoinedPoolsPage> {
+  List<dynamic> _pools = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _pools = List.from(widget.joinedPools);
+    _fetchJoinedPools();
+  }
+
+  Future<void> _fetchJoinedPools() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${APIConstants.baseUrl}/user/joined-pools/${widget.userEmail}'),
+      );
+      
+      if (response.statusCode == 200) {
+        setState(() {
+          _pools = json.decode(response.body);
+        });
+      }
+    } catch (e) {
+      print('Error fetching joined pools: $e');
+    }
+  }
+
+  Future<void> _leavePool(String poolId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('${APIConstants.baseUrl}/user/leave-pool'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'email': widget.userEmail,
+          'poolId': poolId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _pools.removeWhere((pool) => pool['_id'] == poolId);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Successfully left the pool')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error leaving pool: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -11,98 +75,50 @@ class JoinedPoolsPage extends StatelessWidget {
       appBar: AppBar(
         title: Text('Joined Pools'),
       ),
-      body: joinedPools.isEmpty
+      body: _pools.isEmpty
           ? Center(child: Text('No pools joined yet.'))
           : ListView.builder(
               padding: const EdgeInsets.all(10),
-              itemCount: joinedPools.length,
+              itemCount: _pools.length,
               itemBuilder: (context, index) {
-                final pool = joinedPools[index];
-                final source = pool['source'] ?? 'Unknown Source';
-                final destination = pool['destination'] ?? 'Unknown Destination';
-                final startTime = pool['startTime'] ?? 'N/A';
-                final driverName = pool['driver'] ?? 'Unknown Driver';
-                final seatsAvailable = pool['seats']?.toString() ?? 'N/A';
-
-                return Dismissible(
-                  key: Key(pool.toString()), // Unique key for each pool
-                  direction: DismissDirection.endToStart,
-                  onDismissed: (direction) {
-                    // Remove the item from the list
-                    joinedPools.removeAt(index);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Pool removed successfully.'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                  background: Container(
-                    alignment: Alignment.centerRight,
-                    color: Colors.red,
-                    padding: EdgeInsets.symmetric(horizontal: 20),
-                    child: Icon(Icons.delete, color: Colors.white),
-                  ),
-                  child: Card(
-                    elevation: 3,
-                    margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 5),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                final pool = _pools[index];
+                return Card(
+                  margin: EdgeInsets.symmetric(vertical: 8),
+                  child: ListTile(
+                    title: Text('${pool['pickupLocation']} to ${pool['dropoffLocation']}', style: TextStyle(fontWeight: FontWeight.bold),),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Date: ${(pool['startTime'])}'),
+                        Text('Driver Phone: ${pool['driver_phone']}'),
+                        Text('Available Seats: ${pool['seats_available']}'),
+                        Text('Cost: ₹${pool['cost']}'),
+                      ],
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Source: $source',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Destination: $destination',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Start Time: $startTime',
-                            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Driver: $driverName',
-                            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Seats Available: $seatsAvailable',
-                            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                          ),
-                          SizedBox(height: 10),
-                          ElevatedButton(
-                            onPressed: () {
-                              // Remove the pool from the joinedPools list
-                              joinedPools.removeAt(index);
-                              (context as Element).reassemble(); // Rebuild the widget
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Pool removed successfully.'),
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color.fromARGB(255, 0, 0, 0),
+                    trailing: IconButton(
+                      icon: Icon(Icons.delete, color: Colors.red),
+                      onPressed: () => showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: Text('Leave Pool'),
+                          content: Text('Are you sure you want to leave this pool?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: Text('Cancel'),
                             ),
-                            child: Text(
-                              'Leave Pool',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _leavePool(pool['_id']);
+                              },
+                              child: Text('Leave'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.red,
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),

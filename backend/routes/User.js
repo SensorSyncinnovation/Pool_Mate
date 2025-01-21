@@ -58,7 +58,8 @@ router.post('/email', async (req, res) => {
         email,
         phone,
         otp,
-        isVerified: false, // Initially not verified
+        isDriver: false, // Initially not verified
+        joined_pools:[],
         otp_expires_at: new Date(Date.now() + 5 * 60 * 1000), // OTP expires in 5 minutes
       });
 
@@ -110,18 +111,15 @@ router.post('/verify', async (req, res) => {
       return res.status(400).json({ message: 'Invalid or expired OTP' });
     }
 
-    // Mark the user as verified
-    user.isVerified = true;
     user.otp = null; // Clear OTP after successful verification
     await user.save();
 
     // Generate JWT
-    const token = jwt.sign({ id: user._id, email: user.email , phone:user.phone }, SECRET_KEY);
+    const token = jwt.sign({ id: user._id, email: user.email , phoneNumber:user.phone }, SECRET_KEY);
 
     // Set the token as a cookie without expiration and without httpOnly and secure
     res.cookie('token', token);
-    
-    return res.status(200).json({ message: 'OTP verified successfully' });
+    return res.status(200).json({ message: 'OTP verified successfully' , token :token , email:user.email , phoneNumber:user.phone , isDriver:user.isDriver});
   } catch (error) {
     console.error('Error in /verify route:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -169,8 +167,10 @@ router.post('/license', upload.fields([{ name: 'aadhaar' }, { name: 'license' }]
       message: 'Files uploaded successfully',
       data: {
         email: user.email,
-        aadhaarUrl: user.aadhaarUrl,
-        licenseUrl: user.licenseUrl,
+        phone: user.phone,
+        aadhaarUrl: user.Aadhar_url,
+        licenseUrl: user.License_url,
+        isDriver: user.isDriver,
       },
     });
   } catch (error) {
@@ -179,10 +179,11 @@ router.post('/license', upload.fields([{ name: 'aadhaar' }, { name: 'license' }]
   }
 });
 // GET: Check if User is Verified using JWT from Cookies
-router.get('/is-verified', async (req, res) => {
-  try {
-    const token = req.cookies.token;
 
+
+router.all('/is-verified', async (req, res) => {
+  try {
+    const token = req.body.token || req.headers['authorization']?.split(' ')[1];
     if (!token) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
@@ -193,12 +194,12 @@ router.get('/is-verified', async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-
-    if (user.isVerified) {
-      return res.status(200).json({ message: 'User is already verified' });
-    } else {
-      return res.status(200).json({ message: 'User is not verified' });
-    }
+    return res.status(200).json({
+      message: 'success',
+      email: user.email,
+      phoneNumber: user.phone,
+      isDriver: user.isDriver,
+    });
   } catch (error) {
     console.error('Error in /is-verified route:', error);
     res.status(500).json({ message: 'Internal server error' });

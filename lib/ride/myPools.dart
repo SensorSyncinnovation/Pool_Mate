@@ -1,91 +1,96 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-
-import 'package:intl/intl.dart';
+import 'dart:async';
+import '../Constants.dart';
 
 class MyPools extends StatefulWidget {
-  final String driverId; // Pass the driver's ID
+  final String email;
 
-  const MyPools({Key? key, required this.driverId}) : super(key: key);
+  const MyPools({Key? key, required this.email}) : super(key: key);
 
   @override
   _MyPoolsState createState() => _MyPoolsState();
 }
 
 class _MyPoolsState extends State<MyPools> {
-  List<Map<String, dynamic>> carPools = [];
+  List<dynamic> myPools = [];
   bool isLoading = true;
+  Timer? _pollingTimer;
 
   @override
   void initState() {
     super.initState();
-    _fetchCarPools();
-  }
-
-Future<void> _fetchCarPools() async {
-  try {
-    // Fetch all car pools from the server
-    final response = await http.get(Uri.parse('http://192.168.129.42:3000/pools'));
-
-    if (response.statusCode == 200) {
-      List<dynamic> data = json.decode(response.body);
-      
-      // Log the entire response to check the structure
-      print('API Response: $data');
-   
-
-      // Filter car pools by driverId
-      setState(() {
-        carPools = data
-            .where((pool) => pool['driverId'] == widget.driverId)
-            .map((pool) => pool as Map<String, dynamic>)
-            .toList();
-        isLoading = false;
-      });
-
-      // Log the filtered car pools
-      print('Filtered Car Pools: $carPools');
-    } else {
-      throw Exception('Failed to load car pools');
-    }
-  } catch (e) {
-    setState(() {
-      isLoading = false;
+    fetchMyPools();
+    // Start long polling
+    _pollingTimer = Timer.periodic(Duration(seconds: 5), (timer) {
+      if (mounted) {
+        fetchMyPools();
+      }
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Error fetching car pools: $e'),
-        duration: Duration(seconds: 3),
-      ),
-    );
   }
-}
 
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
+  }
 
-  void _deletePool(String id) async {
+  Future<void> fetchMyPools() async {
     try {
-      // Call the API to delete the car pool
-      final response =
-          await http.delete(Uri.parse('http://192.168.129.42:3000/pool/$id'));
+      final response = await http.get(
+        Uri.parse('${APIConstants.baseUrl}/mypools/${widget.email}'),
+      );
 
       if (response.statusCode == 200) {
         setState(() {
-          carPools.removeWhere((pool) => pool['_id'] == id);
+          myPools = json.decode(response.body);
+          isLoading = false;
+        });
+      } else {
+        throw Exception('Failed to load pools');
+      }
+    } catch (e) {
+      print('Error fetching pools: $e');
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  void _deletePool(String id) async {
+    try {
+      print('Deleting pool with id: $id'); // Debug log
+      final url = '${APIConstants.baseUrl}/pool/$id';
+      print('Delete URL: $url'); // Debug log
+      
+      final response = await http.delete(
+        Uri.parse(url),
+      ).timeout(Duration(seconds: 10)); // Add timeout
+
+      print('Delete response status: ${response.statusCode}'); // Debug log
+      print('Delete response body: ${response.body}'); // Debug log
+
+      if (response.statusCode == 200) {
+        setState(() {
+          myPools.removeWhere((pool) => pool['_id'] == id);
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Car pool deleted successfully!"),
+            content: Text("Pool deleted successfully"),
+            backgroundColor: Colors.green,
             duration: Duration(seconds: 2),
           ),
         );
       } else {
-        throw Exception('Failed to delete car pool');
+        throw Exception('Failed to delete pool: Status ${response.statusCode}');
       }
     } catch (e) {
+      print('Delete error: $e'); // Debug log
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error deleting car pool: $e'),
+          content: Text('Error deleting pool: $e'),
+          backgroundColor: Colors.red,
           duration: Duration(seconds: 3),
         ),
       );
@@ -96,81 +101,85 @@ Future<void> _fetchCarPools() async {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          "My Car Pools",
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-        ),
-        centerTitle: true,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.blue, Colors.lightBlueAccent],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
+        title: Text('My Pools'),
       ),
       body: isLoading
           ? Center(child: CircularProgressIndicator())
-          : carPools.isEmpty
-              ? Center(
-                  child: Text(
-                    "No car pools available",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey,
-                    ),
-                  ),
-                )
+          : myPools.isEmpty
+              ? Center(child: Text('No pools found'))
               : ListView.builder(
-                  itemCount: carPools.length,
+                  padding: EdgeInsets.all(16),
+                  itemCount: myPools.length,
                   itemBuilder: (context, index) {
-                    final pool = carPools[index];
+                    final pool = myPools[index];
                     return Card(
-                      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      elevation: 5,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
+                      elevation: 4,
+                      margin: EdgeInsets.only(bottom: 16),
                       child: Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Row(
+                        padding: EdgeInsets.all(16),
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            CircleAvatar(
-                              radius: 30,
-                              backgroundColor: Colors.blueAccent,
-                              child: Text(
-                                pool["seats"].toString(),
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    "${pool['source']} → ${pool['destination']}",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'From: ${pool['pickupLocation'] ?? 'N/A'}',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        'To: ${pool['dropoffLocation'] ?? 'N/A'}',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      '₹${pool['cost'] ?? '0'}',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green,
+                                      ),
                                     ),
-                                  ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    "Seats: ${pool['seats']} | Start Time: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.parse(pool['startTime']))}",
-                                    style: TextStyle(
-                                        fontSize: 14, color: Colors.grey[600]),
-                                  ),
-                                ],
-                              ),
+                                    Text(
+                                      '${pool['seats_available'] ?? 0} seats',
+                                      style: TextStyle(color: Colors.grey[600]),
+                                    ),
+                                    Text(
+                                      '${(pool['passengers'] as List?)?.length ?? 0} passengers',
+                                      style: TextStyle(color: Colors.grey[600]),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Time: ${pool['startTime'] ?? 'N/A'}',
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                            if (pool['driver_phone'] != null) ...[
+                              SizedBox(height: 4),
+                              Text(
+                                'Driver: ${pool['driver_phone']}',
+                                style: TextStyle(color: Colors.grey[600]),
+                              ),
+                            ],
                             IconButton(
                               icon: Icon(Icons.delete, color: Colors.red),
                               onPressed: () {
