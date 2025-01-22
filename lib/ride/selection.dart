@@ -91,7 +91,7 @@ class _RidePageState extends State<RidePage> {
               backgroundColor: Colors.white,
               child: IconButton(
                 icon: Icon(Icons.menu, color: Colors.black),
-                onPressed: () => _logOut(context),
+                onPressed: () => {},
               ),
             ),
           ),
