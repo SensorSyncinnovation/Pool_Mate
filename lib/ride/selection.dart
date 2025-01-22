@@ -7,14 +7,17 @@ import 'package:pool_mate/ride/Find.dart';
 import 'package:http/http.dart' as http;
 import 'package:pool_mate/ride/myPools.dart';
 import 'package:uuid/uuid.dart';
+import 'package:pool_mate/authentication/Terms.dart';
 import '../Constants.dart';
+import 'dart:io';
 
 class RidePage extends StatefulWidget {
   final String email;
   final String phoneNumber;
   final bool isdriver;
+  final bool documents;
   RidePage(
-      {required this.email, required this.phoneNumber, required this.isdriver});
+      {required this.email, required this.phoneNumber, required this.isdriver , required this.documents});
 
   @override
   _RidePageState createState() => _RidePageState();
@@ -29,14 +32,17 @@ class _RidePageState extends State<RidePage> {
   final FlutterSecureStorage secureStorage = FlutterSecureStorage();
   bool _isLoading = false;
 
-  final List<String> _sourcelocation = ['Tada', 'IIITS', 'Sulluepeta'];
-  final List<String> _destinationlocation = ['Tada', 'IIITS', 'Sulluepeta'];
+  final List<String> _sourcelocation = ['Tada', 'IIITS', 'Sullurupeta'];
+  final List<String> _destinationlocation = ['Tada', 'IIITS', 'Sullurupeta'];
 
   @override
   void initState() {
     super.initState();
     _selectedSource = null;
     _selectedDestination = null;
+    // Set initial state based on user type
+    isFindRide = !widget.isdriver; // Non-drivers start with Find Ride
+    isOfferRide = false;
   }
 
   @override
@@ -49,6 +55,42 @@ class _RidePageState extends State<RidePage> {
 
   bool isFindRide = false;
   bool isOfferRide = false;
+
+  // Helper function to make HTTP/HTTPS requests
+  Future<Map<String, dynamic>> makeRequest(String endpoint, dynamic body) async {
+    try {
+      if (APIConstants.baseUrl.startsWith('https')) {
+        // For HTTPS
+        final client = HttpClient()
+          ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+        final request = await client.postUrl(Uri.parse('${APIConstants.baseUrl}$endpoint'));
+        request.headers.set('content-type', 'application/json');
+        request.write(json.encode(body));
+        final response = await request.close();
+        final responseBody = await response.transform(utf8.decoder).join();
+        return {
+          'statusCode': response.statusCode,
+          'body': responseBody,
+        };
+      } else {
+        // For HTTP
+        final response = await http.post(
+          Uri.parse('${APIConstants.baseUrl}$endpoint'),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode(body),
+        );
+        return {
+          'statusCode': response.statusCode,
+          'body': response.body,
+        };
+      }
+    } catch (e) {
+      return {
+        'statusCode': 500,
+        'body': json.encode({'message': 'Network error: ${e.toString()}'})
+      };
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -98,21 +140,23 @@ class _RidePageState extends State<RidePage> {
           Positioned(
             top: 40,
             right: 10,
-            child: CircleAvatar(
-              backgroundColor: Colors.white,
-              child: IconButton(
-                icon: Icon(Icons.search, color: Colors.black),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => MyPools(
-                              email: widget.email,
-                        )),
-                  );
-                },
-              ),
-            ),
+            child: widget.isdriver
+                ? CircleAvatar(
+                    backgroundColor: Colors.white,
+                    child: IconButton(
+                      icon: Icon(Icons.search, color: Colors.black),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => MyPools(
+                                    email: widget.email,
+                                  )),
+                        );
+                      },
+                    ),
+                  )
+                : SizedBox(), // Empty widget if not a driver
           ),
 
           // Ride Information Section (Bottom)
@@ -158,24 +202,48 @@ class _RidePageState extends State<RidePage> {
                         ),
                         child: Text('Find Ride'),
                       ),
-                      ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            isOfferRide = true;
-                            isFindRide = false;
-                          });
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              isOfferRide ? Colors.black : Colors.grey[300],
-                          foregroundColor:
-                              isOfferRide ? Colors.white : Colors.black,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20.0),
+                      if (widget.documents) // Show Offer Ride if driver or if user has documents
+                        ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              isOfferRide = true;
+                              isFindRide = false;
+                            });
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                isOfferRide ? Colors.black : Colors.grey[300],
+                            foregroundColor:
+                                isOfferRide ? Colors.white : Colors.black,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20.0),
+                            ),
                           ),
+                          child: Text('Offer Ride'),
                         ),
-                        child: Text('Offer Ride'),
-                      ),
+                      if ( !widget.documents) // Show Upload Documents if user doesn't have documents
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => TermsAndConditionsPage(
+                                  email: widget.email,
+                                  phoneNumber: widget.phoneNumber,
+                                ),
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                isOfferRide ? Colors.black : Colors.grey[300],
+                            foregroundColor:
+                                isOfferRide ? Colors.white : Colors.black,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20.0),
+                            ),
+                          ),
+                          child: Text('Offer Ride'),
+                        ),
                     ],
                   ),
                   SizedBox(height: 16.0),
@@ -213,45 +281,49 @@ class _RidePageState extends State<RidePage> {
                       onPressed: _isLoading
                           ? null
                           : () async {
-                              if (_selectedSource == null || _selectedDestination == null) {
+                              if (_selectedSource == null ||
+                                  _selectedDestination == null) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Please select both source and destination')),
+                                  SnackBar(
+                                      content: Text(
+                                          'Please select both source and destination')),
                                 );
                                 return;
                               }
 
                               if (_selectedSource == _selectedDestination) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Source and destination cannot be the same')),
+                                  SnackBar(
+                                      content: Text(
+                                          'Source and destination cannot be the same')),
                                 );
                                 return;
                               }
 
                               setState(() => _isLoading = true);
                               try {
-                                var body = json.encode({
+                                final requestBody = {
                                   'pickupLocation': _selectedSource,
                                   'dropoffLocation': _selectedDestination,
-                                });
+                                };
 
-                                final response = await http.post(
-                                  Uri.parse('${APIConstants.baseUrl}/findride'),
-                                  headers: {'Content-Type': 'application/json'},
-                                  body: body,
-                                );
+                                final response = await makeRequest('/findride', requestBody);
 
-                                if (response.statusCode == 200) {
-                                  final rides = json.decode(response.body);
+                                if (response['statusCode'] == 200) {
+                                  final rides = json.decode(response['body']);
                                   if (rides is List && rides.isEmpty) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('No rides available for this route')),
+                                      SnackBar(
+                                          content: Text(
+                                              'No rides available for this route')),
                                     );
                                     return;
                                   }
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => ListOfAvailablePools(
+                                      builder: (context) =>
+                                          ListOfAvailablePools(
                                         availableRides: rides,
                                         userEmail: widget.email,
                                         userPhone: widget.phoneNumber,
@@ -261,8 +333,10 @@ class _RidePageState extends State<RidePage> {
                                 } else {
                                   var errorMessage = 'Failed to find rides';
                                   try {
-                                    final errorBody = json.decode(response.body);
-                                    errorMessage = errorBody['message'] ?? errorMessage;
+                                    final errorBody =
+                                        json.decode(response['body']);
+                                    errorMessage =
+                                        errorBody['message'] ?? errorMessage;
                                   } catch (_) {}
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(content: Text(errorMessage)),
@@ -270,7 +344,9 @@ class _RidePageState extends State<RidePage> {
                                 }
                               } catch (e) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Network error: Please check your connection')),
+                                  SnackBar(
+                                      content: Text(
+                                          'Network error: Please check your connection')),
                                 );
                               } finally {
                                 setState(() => _isLoading = false);
@@ -290,7 +366,8 @@ class _RidePageState extends State<RidePage> {
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
                             )
                           : Text('SEARCH'),
@@ -298,7 +375,7 @@ class _RidePageState extends State<RidePage> {
                   ],
 
                   // Fields for Offer Ride
-                  if (isOfferRide) ...[
+                  if (isOfferRide && widget.documents) ...[
                     _buildDropdownField(
                       hint: 'Select Source',
                       value: _selectedSource,
@@ -342,7 +419,8 @@ class _RidePageState extends State<RidePage> {
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
                             border: InputBorder.none,
-                            prefixIcon: Icon(Icons.event_seat, color: Colors.black),
+                            prefixIcon:
+                                Icon(Icons.event_seat, color: Colors.black),
                             hintText: 'Enter Number of Seats',
                           ),
                         ),
@@ -367,7 +445,8 @@ class _RidePageState extends State<RidePage> {
                           controller: _startTimeController,
                           decoration: InputDecoration(
                             border: InputBorder.none,
-                            prefixIcon: Icon(Icons.access_time, color: Colors.black),
+                            prefixIcon:
+                                Icon(Icons.access_time, color: Colors.black),
                             hintText: 'Enter Start Time (e.g., 10:00 AM)',
                           ),
                         ),
@@ -393,7 +472,8 @@ class _RidePageState extends State<RidePage> {
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
                             border: InputBorder.none,
-                            prefixIcon: Icon(Icons.currency_rupee, color: Colors.black),
+                            prefixIcon:
+                                Icon(Icons.currency_rupee, color: Colors.black),
                             hintText: 'Enter Cost Per Person',
                           ),
                         ),
@@ -412,14 +492,18 @@ class _RidePageState extends State<RidePage> {
                                   _startTimeController.text.isEmpty ||
                                   _costController.text.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Please fill in all fields')),
+                                  SnackBar(
+                                      content:
+                                          Text('Please fill in all fields')),
                                 );
                                 return;
                               }
 
                               if (_selectedSource == _selectedDestination) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Source and destination cannot be the same')),
+                                  SnackBar(
+                                      content: Text(
+                                          'Source and destination cannot be the same')),
                                 );
                                 return;
                               }
@@ -428,16 +512,23 @@ class _RidePageState extends State<RidePage> {
                               final seats = int.tryParse(_seatsController.text);
                               if (seats == null || seats <= 0 || seats > 20) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Please enter a valid number of seats (1-20)')),
+                                  SnackBar(
+                                      content: Text(
+                                          'Please enter a valid number of seats (1-20)')),
                                 );
                                 return;
                               }
 
                               // Validate time format
-                              final timePattern = RegExp(r'^\d{1,2}:\d{2}\s*(AM|PM)$', caseSensitive: false);
-                              if (!timePattern.hasMatch(_startTimeController.text)) {
+                              final timePattern = RegExp(
+                                  r'^\d{1,2}:\d{2}\s*(AM|PM)$',
+                                  caseSensitive: false);
+                              if (!timePattern
+                                  .hasMatch(_startTimeController.text)) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Please enter time in format: HH:MM AM/PM')),
+                                  SnackBar(
+                                      content: Text(
+                                          'Please enter time in format: HH:MM AM/PM')),
                                 );
                                 return;
                               }
@@ -446,33 +537,33 @@ class _RidePageState extends State<RidePage> {
                               final cost = int.tryParse(_costController.text);
                               if (cost == null || cost <= 0) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Please enter a valid cost')),
+                                  SnackBar(
+                                      content:
+                                          Text('Please enter a valid cost')),
                                 );
                                 return;
                               }
 
                               setState(() => _isLoading = true);
                               try {
-                                var body = json.encode({
+                                final requestBody = {
                                   'pickupLocation': _selectedSource,
                                   'dropoffLocation': _selectedDestination,
                                   'startTime': _startTimeController.text,
                                   'cost': cost,
-                                  'seats_available': int.parse(_seatsController.text),
+                                  'seats_available':
+                                      int.parse(_seatsController.text),
                                   'driver_phone': widget.phoneNumber,
                                   'driver_email': widget.email,
-                                });
+                                };
 
-                                final response = await http.post(
-                                  Uri.parse('${APIConstants.baseUrl}/rides'),
-                                  headers: {'Content-Type': 'application/json'},
-                                  body: body,
-                                );
+                                final response = await makeRequest('/rides', requestBody);
 
-                                if (response.statusCode == 201) {
+                                if (response['statusCode'] == 201) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('Car pool created successfully'),
+                                      content:
+                                          Text('Car pool created successfully'),
                                       backgroundColor: Colors.green,
                                     ),
                                   );
@@ -488,14 +579,18 @@ class _RidePageState extends State<RidePage> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => MyPools(email: widget.email),
+                                      builder: (context) =>
+                                          MyPools(email: widget.email),
                                     ),
                                   );
                                 } else {
-                                  var errorMessage = 'Failed to create car pool';
+                                  var errorMessage =
+                                      'Failed to create car pool';
                                   try {
-                                    final errorBody = json.decode(response.body);
-                                    errorMessage = errorBody['message'] ?? errorMessage;
+                                    final errorBody =
+                                        json.decode(response['body']);
+                                    errorMessage =
+                                        errorBody['message'] ?? errorMessage;
                                   } catch (_) {}
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
@@ -507,7 +602,8 @@ class _RidePageState extends State<RidePage> {
                               } catch (e) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text('Network error: Please check your connection'),
+                                    content: Text(
+                                        'Network error: Please check your connection'),
                                     backgroundColor: Colors.red,
                                   ),
                                 );
@@ -552,6 +648,15 @@ class _RidePageState extends State<RidePage> {
     required ValueChanged<String?> onChanged,
     required IconData icon,
   }) {
+    // Filter out the selected value from the other dropdown to prevent same selection
+    List<String> availableItems = items.where((item) {
+      if (hint.contains('Source')) {
+        return item != _selectedDestination;
+      } else {
+        return item != _selectedSource;
+      }
+    }).toList();
+
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
@@ -563,13 +668,23 @@ class _RidePageState extends State<RidePage> {
         hint: Text(hint),
         isExpanded: true,
         underline: Container(), // Remove the default underline
-        items: items.map<DropdownMenuItem<String>>((String item) {
+        items: availableItems.map<DropdownMenuItem<String>>((String item) {
           return DropdownMenuItem<String>(
             value: item,
             child: Text(item),
           );
         }).toList(),
-        onChanged: onChanged,
+        onChanged: (newValue) {
+          if (newValue != null) {
+            // Clear the other dropdown if it has the same value
+            if (hint.contains('Source') && newValue == _selectedDestination) {
+              setState(() => _selectedDestination = null);
+            } else if (hint.contains('Destination') && newValue == _selectedSource) {
+              setState(() => _selectedSource = null);
+            }
+            onChanged(newValue);
+          }
+        },
       ),
     );
   }
@@ -579,8 +694,7 @@ class _RidePageState extends State<RidePage> {
     await secureStorage.delete(key: 'jwt_token');
 
     // Navigate to SignUpPage with email and phone number
-    Navigator.push(
-      context,
+    Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (context) => SignUpScreen(),
       ),

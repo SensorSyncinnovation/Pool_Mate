@@ -113,13 +113,15 @@ router.post('/verify', async (req, res) => {
 
     user.otp = null; // Clear OTP after successful verification
     await user.save();
-
     // Generate JWT
     const token = jwt.sign({ id: user._id, email: user.email , phoneNumber:user.phone }, SECRET_KEY);
-
+    let documents  = true
+    if(!user.Aadhar_url || !user.License_url){
+      documents = false
+    }
     // Set the token as a cookie without expiration and without httpOnly and secure
     res.cookie('token', token);
-    return res.status(200).json({ message: 'OTP verified successfully' , token :token , email:user.email , phoneNumber:user.phone , isDriver:user.isDriver});
+    return res.status(200).json({ message: 'OTP verified successfully' , token :token , email:user.email , phoneNumber:user.phone , isDriver:user.isDriver , documents:documents , doucments:documents});
   } catch (error) {
     console.error('Error in /verify route:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -133,7 +135,7 @@ router.post('/license', upload.fields([{ name: 'aadhaar' }, { name: 'license' }]
     if (!email) {
       return res.status(400).json({ message: 'Email is required' });
     }
-
+    console.log(req.files)
     // Check if files were uploaded
     if (!req.files || !req.files.aadhaar || !req.files.license) {
       return res.status(400).json({ message: 'Aadhaar and License files are required' });
@@ -194,11 +196,17 @@ router.all('/is-verified', async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+    let documents  = true
+    if(!user.Aadhar_url || !user.License_url){
+      documents = false
+    }
+
     return res.status(200).json({
       message: 'success',
       email: user.email,
       phoneNumber: user.phone,
       isDriver: user.isDriver,
+      documents:documents
     });
   } catch (error) {
     console.error('Error in /is-verified route:', error);

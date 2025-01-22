@@ -3,7 +3,6 @@
     <application
         android:label="pool_mate"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
         >
 
         <activity

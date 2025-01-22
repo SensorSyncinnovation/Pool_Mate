@@ -36,31 +36,22 @@ class PhoneVerificationScreen extends StatelessWidget {
           var email = data['email'];
           var phonenumber = data['phoneNumber'];
           var isdriver = data['isDriver'];
+          var documents = data['documents'];
           // Retrieve and print the token from secure storage
           final storedToken = await _secureStorage.read(key: 'jwt_token');
           print('Stored JWT Token: $storedToken'); // Print the token
           print('$isdriver isdriver');
           // Navigate to the next screen on success
-          if (isdriver == true) {
+         
             Navigator.push(
               context,
               MaterialPageRoute(
                   builder: (context) => RidePage(
                       email: email,
                       phoneNumber: phoneNumber,
-                      isdriver: isdriver)),
+                      isdriver: true,
+                      documents: documents,)),
             );
-          } else {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => TermsAndConditionsPage(
-                  email: email,
-                  phoneNumber: phonenumber,
-                ),
-              ),
-            );
-          }
         } else {
           print(response.body);
           // Show error message

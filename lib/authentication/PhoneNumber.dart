@@ -32,13 +32,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
     await _checkVerificationInBackground();
   }
 
-  Future<void> sendOtp(String phoneNumber, String email, BuildContext context) async {
+  Future<void> sendOtp(
+      String phoneNumber, String email, BuildContext context) async {
     print("Attempting to send OTP - Phone: $phoneNumber, Email: $email");
-    
+
     setState(() {
       _isLoading = true;
     });
-    
+
     try {
       final url = '${APIConstants.baseUrl}/email';
       print("Making OTP request to: $url");
@@ -58,7 +59,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       if (response.statusCode == 200) {
         print("OTP sent successfully");
         if (!mounted) return;
-        
+
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -71,7 +72,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       } else {
         print("Failed to send OTP: ${response.statusCode}");
         if (!mounted) return;
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to send OTP. Status: ${response.statusCode}'),
@@ -83,7 +84,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     } catch (e) {
       print("Error sending OTP: $e");
       if (!mounted) return;
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Network error: $e'),
@@ -100,77 +101,79 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
   }
 
-Future<void> _checkVerificationInBackground() async {
-  print("Starting verification check");
-  if (!mounted) {
-    print("Widget not mounted, returning");
-    return;
-  }
+  Future<void> _checkVerificationInBackground() async {
+    print("Starting verification check");
+    if (!mounted) {
+      print("Widget not mounted, returning");
+      return;
+    }
 
-  try {
-    print("Checking for token");
-    final token = await _secureStorage.read(key: 'jwt_token');
-    print("Token found: ${token != null}");
+    try {
+      print("Checking for token");
+      final token = await _secureStorage.read(key: 'jwt_token');
+      print("Token found: ${token != null}");
 
-    if (token != null) {
-      final url = '${APIConstants.baseUrl}/is-verified';
-      print("Making verification request to: $url");
+      if (token != null) {
+        final url = '${APIConstants.baseUrl}/is-verified';
+        print("Making verification request to: $url");
 
-      // Prepare the request parameters
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',  // Use Authorization header for GET requests
-        },
-      );
+        // Prepare the request parameters
+        final response = await http.get(
+          Uri.parse(url),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization':
+                'Bearer $token', // Use Authorization header for GET requests
+          },
+        );
 
-      print("Verification Response Status: ${response.statusCode}");
-      print("Verification Response Body: ${response.body}");
+        print("Verification Response Status: ${response.statusCode}");
+        print("Verification Response Body: ${response.body}");
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        print("Decoded verification data: $data");
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          print("Decoded verification data: $data");
 
-        // Check the verification status and pass user details to the next screen
-        if (data['message'] == 'success' && mounted) {
-          print("User verified, navigating to RidePage");
+          // Check the verification status and pass user details to the next screen
+          if (data['message'] == 'success' && mounted) {
+            print("User verified, navigating to RidePage");
 
-          // Pass the user details to the RidePage
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => RidePage(
-                email: data['email'],        // Pass email
-                phoneNumber: data['phoneNumber'],
-                isdriver: data['isDriver'] ?? false,  // Pass phoneNumber
+            // Pass the user details to the RidePage
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => RidePage(
+                  email: data['email'], // Pass email
+                  phoneNumber: data['phoneNumber'],
+                  isdriver: data['isDriver'] ?? false,
+                  documents: data['documents'] ?? false, // Pass phoneNumber
+                ),
               ),
-            ),
-          );
-          return;
+            );
+            return;
+          }
         }
       }
-    }
-  } catch (e) {
-    print("Error during verification: $e");
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Verification check failed: $e'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 5),
-        ),
-      );
-    }
-  } finally {
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-      print("Loading state set to false");
+    } catch (e) {
+      print("Error during verification: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Verification check failed: $e'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        print("Loading state set to false");
+      }
     }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -238,13 +241,16 @@ Future<void> _checkVerificationInBackground() async {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(15),
-                      borderSide: BorderSide(color: Colors.blueAccent, width: 1.5),
+                      borderSide:
+                          BorderSide(color: Colors.blueAccent, width: 1.5),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(15),
-                      borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
+                      borderSide:
+                          BorderSide(color: Colors.grey.shade300, width: 1),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
+                    contentPadding: const EdgeInsets.symmetric(
+                        vertical: 15, horizontal: 10),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -278,13 +284,16 @@ Future<void> _checkVerificationInBackground() async {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(15),
-                      borderSide: BorderSide(color: Colors.blueAccent, width: 1.5),
+                      borderSide:
+                          BorderSide(color: Colors.blueAccent, width: 1.5),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(15),
-                      borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
+                      borderSide:
+                          BorderSide(color: Colors.grey.shade300, width: 1),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
+                    contentPadding: const EdgeInsets.symmetric(
+                        vertical: 15, horizontal: 10),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -296,19 +305,22 @@ Future<void> _checkVerificationInBackground() async {
                               !_emailController.text.contains('@')) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Please enter a valid phone number and email.'),
+                                content: Text(
+                                    'Please enter a valid phone number and email.'),
                                 backgroundColor: Colors.red,
                               ),
                             );
                           } else {
-                            sendOtp(_phoneController.text, _emailController.text, context);
+                            sendOtp(_phoneController.text,
+                                _emailController.text, context);
                           }
                         },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _isLoading
                         ? Colors.grey
                         : const Color.fromARGB(255, 0, 0, 0),
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 10, horizontal: 10),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -328,7 +340,8 @@ Future<void> _checkVerificationInBackground() async {
                         ),
                       Text(
                         _isLoading ? 'PLEASE WAIT...' : 'SEND OTP',
-                        style: GoogleFonts.inter(fontSize: 16, color: Colors.white),
+                        style: GoogleFonts.inter(
+                            fontSize: 16, color: Colors.white),
                       ),
                     ],
                   ),

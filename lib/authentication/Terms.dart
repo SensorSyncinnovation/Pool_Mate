@@ -21,6 +21,7 @@ class _TermsAndConditionsPageState extends State<TermsAndConditionsPage> {
   String? aadhaarFileName;
   String? licenseFileName;
   bool isAgreed = false;
+  bool _isLoading = false;
 
   Future<void> pickFile(Function(String) onFilePicked) async {
     try {
@@ -124,7 +125,9 @@ class _TermsAndConditionsPageState extends State<TermsAndConditionsPage> {
                         builder: (context) => RidePage(
                             email: email,
                             phoneNumber: phone,
-                            isdriver: isdriver)),
+                            isdriver: isdriver,
+                            documents: true
+                          )),
                   );
                 },
                 child: const Text('OK'),
@@ -232,11 +235,6 @@ class _TermsAndConditionsPageState extends State<TermsAndConditionsPage> {
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
-                'Upload documents only if you want to offer a ride. If not, you can proceed directly to the RidePage.',
-                style: TextStyle(fontSize: 14, color: Colors.black54),
-              ),
-              const SizedBox(height: 24),
               Row(
                 children: [
                   Checkbox(
@@ -257,51 +255,22 @@ class _TermsAndConditionsPageState extends State<TermsAndConditionsPage> {
                 ],
               ),
               const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.black,
-                    ),
-                    child: const Text(
-                      'Cancel',
-                      style: TextStyle(fontSize: 16),
-                    ),
+              ElevatedButton(
+                onPressed: () {
+                  uploadFiles();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  ElevatedButton(
-                    onPressed: () {
-                      if (aadhaarFileName == null && licenseFileName == null) {
-                        // Proceed directly to the RidePage if no files are uploaded
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => RidePage(
-                                  email: widget.email,
-                                  phoneNumber: widget.phoneNumber,
-                                  isdriver: false)),
-                        );
-                      } else {
-                        uploadFiles();
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 12),
-                    ),
-                    child: const Text(
-                      'Agree',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
-                    ),
-                  ),
-                ],
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 24, vertical: 12),
+                ),
+                child: const Text(
+                  'Agree',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
               ),
             ],
           ),
@@ -309,4 +278,4 @@ class _TermsAndConditionsPageState extends State<TermsAndConditionsPage> {
       ),
     );
   }
-}
+} 
