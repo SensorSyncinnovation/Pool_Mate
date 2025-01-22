@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../Constants.dart';
+
 class JoinedPoolsPage extends StatefulWidget {
   final List<dynamic> joinedPools;
   final String userEmail;
@@ -19,6 +20,7 @@ class JoinedPoolsPage extends StatefulWidget {
 
 class _JoinedPoolsPageState extends State<JoinedPoolsPage> {
   List<dynamic> _pools = [];
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -28,6 +30,10 @@ class _JoinedPoolsPageState extends State<JoinedPoolsPage> {
   }
 
   Future<void> _fetchJoinedPools() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
     try {
       final response = await http.get(
         Uri.parse('${APIConstants.baseUrl}/user/joined-pools/${widget.userEmail}'),
@@ -36,10 +42,14 @@ class _JoinedPoolsPageState extends State<JoinedPoolsPage> {
       if (response.statusCode == 200) {
         setState(() {
           _pools = json.decode(response.body);
+          _isLoading = false;
         });
       }
     } catch (e) {
       print('Error fetching joined pools: $e');
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -73,58 +83,80 @@ class _JoinedPoolsPageState extends State<JoinedPoolsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Joined Pools'),
+        title: const Text('Joined Pools'),
+        actions: [
+          if (_isLoading)
+            Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              ),
+            ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _fetchJoinedPools,
+          ),
+        ],
       ),
-      body: _pools.isEmpty
-          ? Center(child: Text('No pools joined yet.'))
-          : ListView.builder(
-              padding: const EdgeInsets.all(10),
-              itemCount: _pools.length,
-              itemBuilder: (context, index) {
-                final pool = _pools[index];
-                return Card(
-                  margin: EdgeInsets.symmetric(vertical: 8),
-                  child: ListTile(
-                    title: Text('${pool['pickupLocation']} to ${pool['dropoffLocation']}', style: TextStyle(fontWeight: FontWeight.bold),),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Date: ${(pool['startTime'])}'),
-                        Text('Driver Phone: ${pool['driver_phone']}'),
-                        Text('Available Seats: ${pool['seats_available']}'),
-                        Text('Cost: ₹${pool['cost']}'),
-                      ],
-                    ),
-                    trailing: IconButton(
-                      icon: Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: Text('Leave Pool'),
-                          content: Text('Are you sure you want to leave this pool?'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: Text('Cancel'),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.pop(context);
-                                _leavePool(pool['_id']);
-                              },
-                              child: Text('Leave'),
-                              style: TextButton.styleFrom(
-                                foregroundColor: Colors.red,
-                              ),
-                            ),
+      body: RefreshIndicator(
+        onRefresh: _fetchJoinedPools,
+        child: _isLoading && _pools.isEmpty
+            ? Center(child: CircularProgressIndicator())
+            : _pools.isEmpty
+              ? Center(child: Text('No pools joined yet.'))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(10),
+                  itemCount: _pools.length,
+                  itemBuilder: (context, index) {
+                    final pool = _pools[index];
+                    return Card(
+                      margin: EdgeInsets.symmetric(vertical: 8),
+                      child: ListTile(
+                        title: Text('${pool['pickupLocation']} to ${pool['dropoffLocation']}', style: TextStyle(fontWeight: FontWeight.bold),),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Date: ${(pool['startTime'])}'),
+                            Text('Driver Phone: ${pool['driver_phone']}'),
+                            Text('Available Seats: ${pool['seats_available']}'),
+                            Text('Cost: ₹${pool['cost']}'),
                           ],
                         ),
+                        trailing: IconButton(
+                          icon: Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: Text('Leave Pool'),
+                              content: Text('Are you sure you want to leave this pool?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                    _leavePool(pool['_id']);
+                                  },
+                                  child: Text('Leave'),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.red,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                );
-              },
-            ),
+                    );
+                  },
+                ),
+      ),
     );
   }
 }

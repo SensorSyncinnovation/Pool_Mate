@@ -100,47 +100,123 @@ class _MyPoolsState extends State<MyPools> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: Text('My Pools'),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        title: Text(
+          'My Pools',
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        actions: [
+          if (isLoading)
+            Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.black,
+                  strokeWidth: 2,
+                ),
+              ),
+            ),
+          IconButton(
+            icon: Icon(Icons.refresh, color: Colors.black),
+            onPressed: fetchMyPools,
+          ),
+        ],
       ),
       body: isLoading
-          ? Center(child: CircularProgressIndicator())
+          ? Center(
+              child: CircularProgressIndicator(
+                color: Colors.black,
+              ),
+            )
           : myPools.isEmpty
-              ? Center(child: Text('No pools found'))
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.directions_car_outlined,
+                        size: 64,
+                        color: Colors.grey,
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'No pools found',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.grey[700],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
               : ListView.builder(
                   padding: EdgeInsets.all(16),
                   itemCount: myPools.length,
                   itemBuilder: (context, index) {
                     final pool = myPools[index];
-                    return Card(
-                      elevation: 4,
+                    return Container(
                       margin: EdgeInsets.only(bottom: 16),
-                      child: Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.black,
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                            ),
+                            child: Row(
                               children: [
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        'From: ${pool['pickupLocation'] ?? 'N/A'}',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                      Row(
+                                        children: [
+                                          Icon(Icons.location_on, color: Colors.white, size: 18),
+                                          SizedBox(width: 8),
+                                          Text(
+                                            '${pool['pickupLocation'] ?? 'N/A'}',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      SizedBox(height: 4),
-                                      Text(
-                                        'To: ${pool['dropoffLocation'] ?? 'N/A'}',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                      SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Icon(Icons.location_on_outlined, color: Colors.white, size: 18),
+                                          SizedBox(width: 8),
+                                          Text(
+                                            '${pool['dropoffLocation'] ?? 'N/A'}',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
@@ -151,43 +227,149 @@ class _MyPoolsState extends State<MyPools> {
                                     Text(
                                       '₹${pool['cost'] ?? '0'}',
                                       style: TextStyle(
-                                        fontSize: 18,
+                                        fontSize: 24,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.green,
+                                        color: Colors.white,
                                       ),
                                     ),
                                     Text(
-                                      '${pool['seats_available'] ?? 0} seats',
-                                      style: TextStyle(color: Colors.grey[600]),
-                                    ),
-                                    Text(
-                                      '${(pool['passengers'] as List?)?.length ?? 0} passengers',
-                                      style: TextStyle(color: Colors.grey[600]),
+                                      '${pool['seats_available'] ?? 0} seats left',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 14,
+                                      ),
                                     ),
                                   ],
                                 ),
                               ],
                             ),
-                            SizedBox(height: 8),
-                            Text(
-                              'Time: ${pool['startTime'] ?? 'N/A'}',
-                              style: TextStyle(color: Colors.grey[600]),
+                          ),
+                          Container(
+                            padding: EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.access_time, size: 18, color: Colors.grey[700]),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Time: ${pool['startTime'] ?? 'N/A'}',
+                                      style: TextStyle(
+                                        color: Colors.grey[700],
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (pool['driver_phone'] != null) ...[
+                                  SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.phone, size: 18, color: Colors.grey[700]),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Driver: ${pool['driver_phone']}',
+                                        style: TextStyle(
+                                          color: Colors.grey[700],
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                                if ((pool['passengers'] as List?)?.isNotEmpty ?? false) ...[
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'Passengers',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  SizedBox(height: 8),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[50],
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        ...((pool['passengers'] as List?) ?? []).map((passenger) => Container(
+                                          padding: EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            border: Border(
+                                              bottom: BorderSide(
+                                                color: Colors.grey.withOpacity(0.2),
+                                                width: 1,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                padding: EdgeInsets.all(8),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.black.withOpacity(0.05),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: Icon(Icons.person, size: 20, color: Colors.black54),
+                                              ),
+                                              SizedBox(width: 12),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      '${passenger['phoneNumber'] ?? 'N/A'}',
+                                                      style: TextStyle(
+                                                        fontWeight: FontWeight.w500,
+                                                        fontSize: 15,
+                                                      ),
+                                                    ),
+                                                    SizedBox(height: 4),
+                                                    Text(
+                                                      '${passenger['email'] ?? 'N/A'}',
+                                                      style: TextStyle(
+                                                        color: Colors.grey[600],
+                                                        fontSize: 14,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        )).toList(),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                SizedBox(height: 16),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    TextButton.icon(
+                                      onPressed: () => _deletePool(pool["_id"]),
+                                      icon: Icon(Icons.delete_outline, color: Colors.red),
+                                      label: Text(
+                                        'Delete Pool',
+                                        style: TextStyle(color: Colors.red),
+                                      ),
+                                      style: TextButton.styleFrom(
+                                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                            if (pool['driver_phone'] != null) ...[
-                              SizedBox(height: 4),
-                              Text(
-                                'Driver: ${pool['driver_phone']}',
-                                style: TextStyle(color: Colors.grey[600]),
-                              ),
-                            ],
-                            IconButton(
-                              icon: Icon(Icons.delete, color: Colors.red),
-                              onPressed: () {
-                                _deletePool(pool["_id"]);
-                              },
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     );
                   },
