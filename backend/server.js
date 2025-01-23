@@ -4,7 +4,7 @@ const app = express();
 const port = 3000;
 const cors = require('cors');
 const { mongo, default: mongoose } = require('mongoose');
-app.listen(port, '0.0.0.0', () => {
+app.listen(port, () => {
     console.log(`Server is running on http://0.0.0.0:${port}`);
   });
 

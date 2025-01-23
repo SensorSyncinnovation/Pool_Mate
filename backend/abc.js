@@ -1,7 +1,6 @@
-import nodemailer from 'nodemailer';
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
+const User = require("./models/UserSchema")
 
-const my_email = "sensorsyncinnovation@gmail.com";
 const uri = 'mongodb+srv://sensorsyncinnovation:SreeH2025!@cluster0.jpksx.mongodb.net/pool_mate';
 
 // Function to connect to MongoDB
@@ -14,31 +13,32 @@ async function connectDB() {
   }
 }
 
-// Call the function to connect
-connectDB();
-
-// Configure Nodemailer
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: my_email,
-    pass: 'cvnz vsvd jsmg zuto', // Your email password or app-specific password
-  },
-});
-
-const mailOptions = {
-  from: my_email,
-  to: '"pinnukoushikp@gmail.com"',
-  subject: 'Test',
-  text: `This is a test email.`,
-};
-
-// Send the email
-(async () => {
+// Function to create a sample user
+async function createSampleUser() {
   try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log("Email sent successfully:", info.response);
+    const sampleUser = new User({
+      name: "John Doe",
+      role: "User",
+      email: "johndoe@example.com",
+      phone: "1234567890",
+      otp: "654321", // Example OTP
+      otp_expires_at: new Date(Date.now() + 5 * 60 * 1000), // OTP valid for 5 minutes
+      isDriver: false,
+      Aadhar_url: null,
+      License_url: null,
+      joined_pools: [],
+    });
+
+    const savedUser = await sampleUser.save();
+    console.log("Sample user created successfully:", savedUser);
   } catch (error) {
-    console.error("Error while sending email:", error.message);
+    console.error("Error while creating sample user:", error.message);
   }
+}
+
+// Connect to DB and create user
+(async () => {
+  await connectDB();
+  await createSampleUser();
+  mongoose.connection.close(); // Close the connection after completion
 })();
