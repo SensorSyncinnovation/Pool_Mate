@@ -20,9 +20,9 @@ const transporter = nodemailer.createTransport({
 });
 
 cloudinary.config({
-  cloud_name: 'desncpevo', // Replace with your Cloudinary cloud name
-  api_key: '346261456696579', // Replace with your Cloudinary API key
-  api_secret: 'RIKyOt_3VBDahOJ5NdcIGFlA5JE', // Replace with your Cloudinary API secret
+  cloud_name: 'dhurul1ik', // Replace with your Cloudinary cloud name
+  api_key: '372333877884267', // Replace with your Cloudinary API key
+  api_secret: 'xvhuOc8Ja_Du64B0txtQCLPMmkg', // Replace with your Cloudinary API secret
 });
 
 const storage = new CloudinaryStorage({
