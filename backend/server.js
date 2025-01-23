@@ -9,8 +9,7 @@ app.listen(port, '0.0.0.0', () => {
   });
 
 // MongoDB connection string
-const uri = "mongodb+srv://koushik:koushik@cluster0.h2lzgvs.mongodb.net/poolmate";
-
+const uri = 'mongodb+srv://sensorsyncinnovation:SreeH2025!@cluster0.jpksx.mongodb.net/pool_mate';
 
 // Middleware
 app.get("/", function (req, res){res.send('yo')})

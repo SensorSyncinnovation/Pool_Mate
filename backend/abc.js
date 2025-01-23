@@ -1,20 +1,44 @@
-// const nodemailer = require('nodemailer')
-import nodemailer from 'nodemailer'
-const my_email = "koushik.p22@iiits.in"
+import nodemailer from 'nodemailer';
+import mongoose from 'mongoose';
+
+const my_email = "sensorsyncinnovation@gmail.com";
+const uri = 'mongodb+srv://sensorsyncinnovation:SreeH2025!@cluster0.jpksx.mongodb.net/pool_mate';
+
+// Function to connect to MongoDB
+async function connectDB() {
+  try {
+    await mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true });
+    console.log("Connected to MongoDB!");
+  } catch (error) {
+    console.error("Failed to connect to MongoDB:", error.message);
+  }
+}
+
+// Call the function to connect
+connectDB();
+
 // Configure Nodemailer
 const transporter = nodemailer.createTransport({
-  service: 'gmail', // Use your preferred email service
+  service: 'gmail',
   auth: {
-    user: my_email, // Your email
-    pass: 'evpx kleh ppsv zcsy', // Your email password or app-specific password
+    user: my_email,
+    pass: 'cvnz vsvd jsmg zuto', // Your email password or app-specific password
   },
 });
 
 const mailOptions = {
-    from: my_email,
-    to: 'pinnukousihkp@gmail.com',
-    subject: 'Your OTP for Verification',
-    text: `Your OTP `,
-  };
+  from: my_email,
+  to: '"pinnukoushikp@gmail.com"',
+  subject: 'Test',
+  text: `This is a test email.`,
+};
 
-  await transporter.sendMail(mailOptions);
+// Send the email
+(async () => {
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Email sent successfully:", info.response);
+  } catch (error) {
+    console.error("Error while sending email:", error.message);
+  }
+})();
