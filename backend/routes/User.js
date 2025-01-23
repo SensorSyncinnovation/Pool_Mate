@@ -49,22 +49,30 @@ router.post('/email', async (req, res) => {
       return res.status(400).json({ message: 'Email and phone are required' });
     }
 
-    // Generate OTP
+    // Check if the user exists
+    let user = await User.findOne({ email: email });
     const otp = crypto.randomInt(100000, 999999);
+    if (!user) {
+      // Create a new user with OTP and phone
+      user = new User({
+        email,
+        phone,
+        otp,
+        isDriver: false, // Initially not verified
+        joined_pools:[],
+        otp_expires_at: new Date(Date.now() + 5 * 60 * 1000), // OTP expires in 5 minutes
+      });
 
-    // Check if the user exists and upsert
-    let user = await User.findOneAndUpdate(
-      { email: email }, // Filter
-      {
-        $set: { phone, otp, otp_expires_at: new Date(Date.now() + 5 * 60 * 1000) },
-        $setOnInsert: { isDriver: false, joined_pools: [] }, // Only set on insert
-      },
-      { new: true, upsert: true } // Return updated document and create if not exists
-    );
+      await user.save();
+    } else {
+      // Update OTP for existing user
+      user.otp = otp;
+      user.otp_expires_at = new Date(Date.now() + 5 * 60 * 1000); // OTP expires in 5 minutes
+      await user.save().then(()=>{console.log("user saved successfully");
+      });
+    }
 
-    console.log('User updated or created:', user);
-
-    // Send OTP via email asynchronously
+    // Send OTP via email
     const mailOptions = {
       from: my_email,
       to: email,
@@ -72,14 +80,7 @@ router.post('/email', async (req, res) => {
       text: `Your OTP is ${otp}. It is valid for 5 minutes.`,
     };
 
-    transporter.sendMail(mailOptions, (err, info) => {
-      if (err) {
-        console.error('Failed to send email:', err);
-        // Log the error but don't block the response
-      } else {
-        console.log('Email sent:', info.response);
-      }
-    });
+    await transporter.sendMail(mailOptions);
 
     return res.status(200).json({ message: 'OTP sent to email successfully' });
   } catch (error) {
@@ -87,7 +88,6 @@ router.post('/email', async (req, res) => {
     return res.status(500).json({ message: 'Internal server error' });
   }
 });
-
 
 
 // POST: Verify OTP and Generate JWT
