@@ -1,3 +1,3 @@
 class APIConstants {
-  static const String baseUrl = 'https://pool-mate-xi.vercel.app';
+  static const String baseUrl = 'http://192.168.59.232:3000';
 }

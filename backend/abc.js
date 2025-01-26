@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const User = require("./models/UserSchema")
-
+const admin = require("./firebase")
 const uri = 'mongodb+srv://sensorsyncinnovation:SreeH2025!@cluster0.jpksx.mongodb.net/pool_mate';
 
 // Function to connect to MongoDB

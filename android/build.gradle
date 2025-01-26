@@ -1,3 +1,5 @@
+// Root-level build.gradle file
+
 allprojects {
     repositories {
         google()
@@ -15,4 +17,15 @@ subprojects {
 
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
+}
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.0.2' // Ensure this is compatible with your project
+        classpath 'com.google.gms:google-services:4.3.15' // Add Google Services plugin
+    }
 }

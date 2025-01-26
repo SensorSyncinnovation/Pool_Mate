@@ -97,6 +97,46 @@ class _MyPoolsState extends State<MyPools> {
     }
   }
 
+  void _removePassenger(String poolId, String passengerEmail) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('${APIConstants.baseUrl}/remove-passenger'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'poolId': poolId,
+          'email': passengerEmail,
+        }),
+      );
+
+      print('Remove passenger response status: ${response.statusCode}');
+      print('Remove passenger response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        // Refresh the pools to get the updated data
+        await fetchMyPools();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Passenger removed successfully"),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        throw Exception('Failed to remove passenger: Status ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Remove passenger error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error removing passenger: $e'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -338,6 +378,10 @@ class _MyPoolsState extends State<MyPools> {
                                                     ),
                                                   ],
                                                 ),
+                                              ),
+                                              IconButton(
+                                                icon: Icon(Icons.remove_circle, color: Colors.red),
+                                                onPressed: () => _removePassenger(pool["_id"], passenger['email']),
                                               ),
                                             ],
                                           ),
