@@ -1,20 +1,39 @@
+
 plugins {
     id "com.android.application"
     id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
-    id "com.google.gms.google-services" // Add the Google Services plugin
+    id "com.google.gms.google-services" // For Firebase
+}
+
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
 android {
-    namespace "com.example.pool_mate"  // Ensure this is your package name
-    compileSdk 34 // Set compileSdk to 34
+    namespace 'com.example.pool_mate'  // Specify the namespace for your app module
+
+    compileSdk 34
 
     defaultConfig {
         applicationId "com.example.pool_mate"
-        minSdk 21 // Change minSdkVersion to 21
-        targetSdk 34 // Set targetSdk to 34
+        minSdk 21
+        targetSdk 34
+        multiDexEnabled true
         versionCode 1
         versionName "1.0"
+    }
+
+
+
+   buildTypes {
+        release {
+            // TODO: Add your own signing config for the release build.
+            // Signing with the debug keys for now, so `flutter run --release` works.
+            signingConfig = signingConfigs.debug
+        }
     }
 
     compileOptions {
@@ -25,21 +44,13 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
-
-    buildTypes {
-        release {
-            minifyEnabled true
-            shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
-        debug {
-            minifyEnabled false
-            shrinkResources false
-        }
-    }
 }
 
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.8.20" // Kotlin support
+    implementation "androidx.multidex:multidex:2.0.1" // MultiDex support
+    implementation platform('com.google.firebase:firebase-bom:32.0.0') // Firebase BOM
+    implementation 'com.google.firebase:firebase-messaging' // For Firebase Messaging
+    implementation 'com.android.support:multidex:2.0.1'
 
-flutter {
-    source "../.."
 }
