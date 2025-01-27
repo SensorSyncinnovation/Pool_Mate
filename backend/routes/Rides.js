@@ -242,36 +242,64 @@ router.post('/findride', async (req, res) => {
       hour12: true 
     });
 
-    // Find rides that match location and are in the future
-    const rides = await Rides.find({
-      pickupLocation,
-      dropoffLocation,
-      $or: [
-        // Rides on future dates
-        { date: { $gt: currentDateString } },
-        // Rides on current date with future times
-        { 
-          date: currentDateString,
-          startTime: { 
-            $gt: currentTime 
-          } 
+    // Fetch all rides from the database
+    const rides = await Rides.find().exec();
+    console.log('Fetched rides:', rides);
+
+    const validRides = [];
+
+    rides.forEach((ride) => {
+      // Log ride data for debugging
+      // console.log('Checking ride:', ride);
+
+      // Ensure pickup and dropoff locations match
+      if (ride.pickupLocation === pickupLocation && ride.dropoffLocation === dropoffLocation) {
+        console.log(`Ride matches location: ${ride.pickupLocation} -> ${ride.dropoffLocation}`);
+        // Convert the ride's start time to a Date object for comparison
+        const [rideHours, rideMinutes] = ride.startTime.split(' ')[0].split(':');
+        const rideAMPM = ride.startTime.split(' ')[1];
+        const rideDate = new Date(currentDate);
+        rideDate.setHours(rideAMPM === 'PM' ? parseInt(rideHours) + 12 : parseInt(rideHours));
+        rideDate.setMinutes(parseInt(rideMinutes));
+        
+        const currentTimeDate = new Date(currentDate);
+        const [currentHours, currentMinutes] = currentTime.split(':');
+        const currentAMPM = currentTime.split(' ')[1];
+        currentTimeDate.setHours(currentAMPM === 'PM' ? parseInt(currentHours) + 12 : parseInt(currentHours));
+        currentTimeDate.setMinutes(parseInt(currentMinutes));
+
+        console.log(`Ride time: ${ride.startTime}, Current time: ${currentTime}`);
+        console.log('Converted ride time:', rideDate, "   Converted current time:", currentTimeDate);
+
+        // Compare the ride's start date and time
+        if (ride.date >= currentDateString && rideDate > currentTimeDate) {
+          console.log('Ride time is greater than current time');
+
+          // Check if the user is not already a passenger or the driver
+          const isPassenger = ride.passengers.some((passenger) => passenger.email === email);
+          const isDriver = ride.driver_email === email;
+          
+          if (!isPassenger && !isDriver) {
+            validRides.push(ride); // Add valid rides to the list
+            console.log('Added valid ride:', ride);
+          }
+        } else {
+          console.log('Current time is greater than ride time or ride is in the past');
         }
-      ],
-      // Only show open rides with available seats and email not in passengers list
-      status: 'open',
-      seats_available: { $gt: 0 },
-      passengers: { $not: { $elemMatch: { email } } }
-    }).exec();
-    console.log(rides);
-    res.json(rides);
-  } catch (err) {
-    console.error('Error finding rides:', err);
-    res.status(500).json({ 
-      message: 'Error finding rides', 
-      error: err.message 
+      } else {
+        console.log(`Ride of ${pickupLocation}-> ${dropoffLocation} does not match the location: ${ride.pickupLocation} -> ${ride.dropoffLocation}`);
+      }
     });
+
+    // Send valid rides as response
+    console.log('Valid rides found:', validRides);
+    res.status(200).json(validRides);  
+  } catch (error) {
+    console.error('Error finding rides:', error);
+    res.status(500).json({ error: 'Something went wrong while finding rides' });
   }
 });
+
 
 router.post('/join-pool', async (req, res) => {
   try {
