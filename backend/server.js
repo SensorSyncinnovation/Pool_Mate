@@ -31,9 +31,11 @@ async function connectDB() {
 }
 connectDB();
 
+const notificationRoutes = require('./routes/notification');
 
 app.use('/' , require("./routes/User"))
 app.use('/' , require("./routes/Rides"))
+app.use('/api/notifications', notificationRoutes);
 // // MongoDB Collection Reference
 // app.get('/pool/:carPoolId', async (req, res) => {
 //     try {

@@ -89,7 +89,6 @@ router.post('/email', async (req, res) => {
   }
 });
 
-
 // POST: Verify OTP and Generate JWT
 router.post('/verify', async (req, res) => {
   try {

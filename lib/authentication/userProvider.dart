@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pool_mate/Constants.dart';
 
 class UserProvider with ChangeNotifier {
   String? _userId;
@@ -12,6 +13,7 @@ class UserProvider with ChangeNotifier {
     _userId = userId;
     _phoneNumber = phoneNumber;
     _email = email;
+    Constants.userId = userId; // Update Constants
     notifyListeners(); // Notify listeners when data is updated
   }
 }

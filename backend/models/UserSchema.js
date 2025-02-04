@@ -10,6 +10,7 @@ const UserSchema = mongoose.Schema({
     isDriver:Boolean,
     Aadhar_url:String , 
     License_url:String,
+    fcmToken: { type: String }, // Added for push notifications
     created_at: { type: Date, default: Date.now },
     joined_pools:[String],
     updated_at: { type: Date, default: Date.now }
