@@ -1,4 +1,4 @@
-package com.example.pool_mate
+package com.poolmate.app
 
 import io.flutter.embedding.android.FlutterActivity
 

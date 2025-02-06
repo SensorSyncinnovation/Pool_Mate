@@ -1,24 +1,25 @@
-
 plugins {
     id "com.android.application"
     id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
-    id "com.google.gms.google-services" // For Firebase
+    id "com.google.gms.google-services"
 }
 
 def keystoreProperties = new Properties()
-def keystorePropertiesFile = rootProject.file('key.properties')
+def keystorePropertiesFile = rootProject.file('keystore.properties')
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+} else {
+    throw new GradleException("Missing keystore.properties file. Please create it in android/ directory.")
 }
 
 android {
-    namespace 'com.example.pool_mate'  // Specify the namespace for your app module
+    namespace 'com.poolmate.app'
 
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.example.pool_mate"
+        applicationId "com.poolmate.app"
         minSdk 21
         targetSdk 34
         multiDexEnabled true
@@ -26,13 +27,20 @@ android {
         versionName "1.0"
     }
 
-
-
-   buildTypes {
+    signingConfigs {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+            storeFile file(keystoreProperties['storeFile'])
+            storePassword keystoreProperties['storePassword']
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 
@@ -47,10 +55,8 @@ android {
 }
 
 dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.8.20" // Kotlin support
-    implementation "androidx.multidex:multidex:2.0.1" // MultiDex support
-    implementation platform('com.google.firebase:firebase-bom:32.0.0') // Firebase BOM
-    implementation 'com.google.firebase:firebase-messaging' // For Firebase Messaging
-    implementation 'com.android.support:multidex:2.0.1'
-
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.8.20"
+    implementation "androidx.multidex:multidex:2.0.1"
+    implementation platform('com.google.firebase:firebase-bom:32.0.0')
+    implementation 'com.google.firebase:firebase-messaging'
 }
