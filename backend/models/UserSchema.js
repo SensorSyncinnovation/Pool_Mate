@@ -10,9 +10,17 @@ const UserSchema = mongoose.Schema({
     isDriver:Boolean,
     Aadhar_url:String , 
     License_url:String,
-    fcmToken: { type: String }, // Added for push notifications
     created_at: { type: Date, default: Date.now },
-    joined_pools:[String],
+    joined_pools:[{
+        id:String,
+        driver_phone:String,
+        driver_email:String,
+        driver_fcms: String,
+        pickupLocation: String,
+        dropoffLocation: String,
+        startTime: String,
+    }],
+    history:[String],
     updated_at: { type: Date, default: Date.now }
 })
 

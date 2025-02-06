@@ -8,9 +8,10 @@ const nodemailer = require('nodemailer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const User = require('../models/UserSchema');
-
+const admin = require('../firebase');
 const SECRET_KEY = "your_secret_key"; // Replace with a secure key in production
 const my_email = "koushik.p22@iiits.in"
+
 // Configure Nodemailer
 const transporter = nodemailer.createTransport({
   service: 'gmail', // Use your preferred email service
@@ -18,56 +19,57 @@ const transporter = nodemailer.createTransport({
     user: my_email, // Your email
     pass: 'evpx kleh ppsv zcsy', // Your email password or app-specific password
   },
+     
+     
+     
 });
 
-function sendRideCreationEmail(ride) {
-  const mailOptions = {
-      from: my_email,
-      to: ride.driver_email,
-      subject: 'Ride Created',
-      text: `Your ride from ${ride.pickupLocation} to ${ride.dropoffLocation} at ${ride.startTime} has been created. 
-      The cost of the ride is ${ride.cost} and there are ${ride.seats_available} seats available.`
-  };
+const sendNotificationToDriverAndPassenger = async (driverFCMToken, seats_available, passengerFCMToken, message) => {
+  try {
+    console.log(`Sending notification to driver: ${driverFCMToken}`);
+    // Send notification to the driver
+    await admin.messaging().send({
+      token: driverFCMToken,
+      notification: {
+        title: 'New Passenger Joined Pool',
+        body: `A new passenger has joined your pool. ${seats_available} seats are available.`,
+      },
+    });
+    console.log('Notification sentto driver successfully');
 
-  transporter.sendMail(mailOptions, (err, info) => {
-      if (err) {
-          console.log(err);
-      } else {
-          console.log(`Email sent to ${ride.driver_email}`);
-      }
-  });
+    console.log(`Sending notification to passenger: ${passengerFCMToken}`);
+    // Send notification to the passenger
+    await admin.messaging().send({
+      token: passengerFCMToken,
+      notification: {
+        title: 'Joined Pool Successfully',
+        body: message,
+      },
+    });
+    console.log('Notification sent to passenger successfully');
+  } catch (error) {
+    console.error('Error sending FCM notification:', error);
+  }
+};
+async function sendRemovePassengerNotification(fcmToken, pool, message) {
+  console.log(`Sending notification to passenger: ${fcmToken}`);
+  try {
+    // Implement your FCM notification logic here
+    // Example: Using Firebase Admin SDK
+const payload = {
+      notification: {
+        title: 'Pool Update',
+        body: message,
+      },
+token: fcmToken,
+    };
+
+    await admin.messaging().send(payload);
+    console.log('Notification sent successfully');
+  } catch (error) {
+    console.error('Error sending notification:', error);
+  }
 }
-
-function sendJoinPoolEmail(pool, user, remainingSeats) {
-  const mailOptions = {
-    from: my_email,
-    to: pool.driver_email,
-    subject: 'New User Joined Your Pool',
-    text: `A new user has joined your pool!
-    
-Pool Details:
-- From: ${pool.pickupLocation} to ${pool.dropoffLocation}
-- Date: ${pool.startTime}
-- Cost: ${pool.cost}
-
-User Details:
-- Email: ${user.email}
-- Phone: ${user.phone}
-
-Remaining seats: ${remainingSeats}
-
-Thank you for using Pool Mate!`
-  };
-
-  transporter.sendMail(mailOptions, (err, info) => {
-    if (err) {
-      console.log('Error sending join pool email:', err);
-    } else {
-      console.log(`Join pool notification sent to ${pool.driver_email}`);
-    }
-  });
-}
-
 function sendLeavePoolEmail(pool, user, remainingSeats) {
   const mailOptions = {
     from: my_email,
@@ -85,17 +87,53 @@ User Details:
 - Phone: ${user.phone}
 
 Remaining seats: ${remainingSeats}
+      
 
 Thank you for using Pool Mate!`
   };
 
-  transporter.sendMail(mailOptions, (err, info) => {
+  transporter.sendMail(mailOptions, (err, info) => {  
     if (err) {
       console.log('Error sending leave pool email:', err);
     } else {
       console.log(`Leave pool notification sent to ${pool.driver_email}`);
     }
   });
+}
+// Function to send notifications to user and driver
+async function sendLeavePoolNotification(fcmToken, pool, user) {
+  const payload = {
+    notification: {
+      title: 'Pool Update',
+      body: `${user.email} has left the pool from ${pool.pickupLocation} to ${pool.dropoffLocation}.`,
+    },
+    token: fcmToken,
+  };
+
+  console.log(`Sending notification to driver: ${fcmToken}`);
+  try {
+    await admin.messaging().send(payload);
+    console.log('Notification sent successfully');
+  } catch (error) {
+    console.error('Error sending notification:', error);
+  }
+}
+async function sendDriverCancelNotification(fcmToken, pool, driver) {
+  const payload = {
+    notification: {
+      title: 'Ride Canceled',
+      body: `The driver ${driver.name} has canceled the ride from ${pool.pickupLocation} to ${pool.dropoffLocation}.`,
+    },
+    token: fcmToken,
+  };
+
+  console.log(`Sending notification to passenger: ${fcmToken}`);
+  try {
+    await admin.messaging().send(payload);
+    console.log('Notification sent successfully');
+  } catch (error) {
+    console.error('Error sending notification:', error);
+  }
 }
 
 router.get('/rides', async  (req, res)=> {
@@ -107,42 +145,230 @@ router.get('/rides', async  (req, res)=> {
       res.status(500).send(err);
   }
 });
-
 router.post('/rides', async (req, res) => {
   try {
+    // Validate input fields
+    const { 
+      pickupLocation, 
+      dropoffLocation, 
+      date, 
+      startTime, 
+      cost, 
+      seats_available, 
+      driver_phone, 
+      driver_email 
+    } = req.body;
 
-      const ride = new Rides({
-          driver: "",
-          passengers: [],
-          pickupLocation: req.body.pickupLocation,
-          dropoffLocation: req.body.dropoffLocation,
-          startTime: req.body.startTime,
-          cost: req.body.cost,
-          seats_available: Number(req.body.seats_available),
-          driver_phone:req.body.driver_phone,
-          driver_email:req.body.driver_email,
-      });
+    // Validate date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(date)) {
+      return res.status(400).json({ message: 'Invalid date format. Use YYYY-MM-DD' });
+    }
 
-      const savedRide = await ride.save();
-      sendRideCreationEmail(savedRide);
-      res.status(201).json(savedRide);
+    // Validate time format (HH:MM AM/PM)
+    const timeRegex = /^(0[1-9]|1[0-2]):[0-5][0-9]\s*(AM|PM)$/i;
+    if (!timeRegex.test(startTime)) {
+      return res.status(400).json({ message: 'Invalid time format. Use HH:MM AM/PM' });
+    }
+
+    // Find the user to get FCM token
+    const user = await User.findOne({ email: driver_email });
+
+    // Check for existing rides at the same time and location
+    const existingRide = await Rides.findOne({
+      pickupLocation,
+      dropoffLocation,
+      date,
+      startTime,
+      driver_email
+    });
+
+    if (existingRide) {
+      return res.status(400).json({ message: 'A ride with the same details already exists' });
+    }
+
+    // Create new ride
+    const ride = new Rides({
+      driver: '', // You might want to populate this with user's name if available
+      passengers: [],
+      pickupLocation,
+      dropoffLocation,
+      date,
+      startTime,
+      cost,
+      seats_available: Number(seats_available),
+      driver_phone,
+      driver_email,
+      driver_fcms: user ? user.fcmToken : ''
+    });
+
+    const savedRide = await ride.save();
+
+    // Send FCM notification if user has a token
+    if (user && user.fcmToken) {
+      const message = {
+        notification: {
+          title: 'New Ride Created',
+          body: `Hi ${driver_email}, a new ride from ${pickupLocation} to ${dropoffLocation} on ${date} at ${startTime} has been created. The cost of the ride is ${cost} and there are ${seats_available} seats available.`,
+        },
+        token: user.fcmToken,
+      };
+      
+      try {
+        await admin.messaging().send(message);
+        console.log('Notification sent successfully to:', user.fcmToken);
+      } catch (error) {
+        console.error('Error sending notification:', error);
+      }
+    } else {
+      console.warn('No FCM token available for this user.');
+    }
+
+    res.status(201).json(savedRide);
   } catch (error) {
-      console.log(error);
-      res.status(500).json({ message: 'Failed to create ride', error });
+    console.error('Ride creation error:', error);
+    res.status(500).json({ message: 'Failed to create ride', error: error.message });
+  }
+});
+router.post('/findride', async (req, res) => {
+  const { pickupLocation, dropoffLocation, email } = req.body;
+  try {
+    // Get current date and time
+    const currentDate = new Date();
+    const currentDateString = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
+    const currentTime = currentDate.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      hour12: true 
+    });
+
+    // Fetch all rides from the database
+    const rides = await Rides.find().exec();
+    console.log('Fetched rides:', rides);
+
+    const validRides = [];
+
+    rides.forEach((ride) => {
+      // Log ride data for debugging
+      // console.log('Checking ride:', ride);
+
+      // Ensure pickup and dropoff locations match
+      if (ride.pickupLocation === pickupLocation && ride.dropoffLocation === dropoffLocation) {
+        console.log(`Ride matches location: ${ride.pickupLocation} -> ${ride.dropoffLocation}`);
+        // Convert the ride's start time to a Date object for comparison
+        const [rideHours, rideMinutes] = ride.startTime.split(' ')[0].split(':');
+        const rideAMPM = ride.startTime.split(' ')[1];
+        const rideDate = new Date(currentDate);
+        rideDate.setHours(rideAMPM === 'PM' ? parseInt(rideHours) + 12 : parseInt(rideHours));
+        rideDate.setMinutes(parseInt(rideMinutes));
+        
+        const currentTimeDate = new Date(currentDate);
+        const [currentHours, currentMinutes] = currentTime.split(':');
+        const currentAMPM = currentTime.split(' ')[1];
+        currentTimeDate.setHours(currentAMPM === 'PM' ? parseInt(currentHours) + 12 : parseInt(currentHours));
+        currentTimeDate.setMinutes(parseInt(currentMinutes));
+
+        console.log(`Ride time: ${ride.startTime}, Current time: ${currentTime}`);
+        console.log('Converted ride time:', rideDate, "   Converted current time:", currentTimeDate);
+
+        // Compare the ride's start date and time
+        if (ride.date >= currentDateString && rideDate > currentTimeDate) {
+          console.log('Ride time is greater than current time');
+
+          // Check if the user is not already a passenger or the driver
+          const isPassenger = ride.passengers.some((passenger) => passenger.email === email);
+          const isDriver = ride.driver_email === email;
+          
+          if (!isPassenger && !isDriver) {
+            validRides.push(ride); // Add valid rides to the list
+            console.log('Added valid ride:', ride);
+          }
+        } else {
+          console.log('Current time is greater than ride time or ride is in the past');
+        }
+      } else {
+        console.log(`Ride of ${pickupLocation}-> ${dropoffLocation} does not match the location: ${ride.pickupLocation} -> ${ride.dropoffLocation}`);
+      }
+    });
+
+    // Send valid rides as response
+    console.log('Valid rides found:', validRides);
+    res.status(200).json(validRides);  
+  } catch (error) {
+    console.error('Error finding rides:', error);
+    res.status(500).json({ error: 'Something went wrong while finding rides' });
   }
 });
 
-router.post('/findride', async (req, res) => {
-  const { pickupLocation, dropoffLocation } = req.body;
+
+router.post('/join-pool', async (req, res) => {
   try {
-      const rides = await Rides.find({
-          pickupLocation,
-          dropoffLocation,
-      }).exec();
-      res.json(rides);
-  } catch (err) {
-      res.status(500).send(err);
+    const { email, poolId } = req.body;
+    
+    // Check if pool exists and has available seats
+    const pool = await Rides.findById(poolId);
+    if (!pool) {
+      return res.status(404).json({ message: 'Pool not found' });
+    }
+
+    if (pool.seats_available <= 0) {
+      return res.status(400).json({ message: 'No seats available in this pool' });
+    }
+    // Get user details
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    // Add user to the pool and update user joined pools
+    const updatedUser = await User.findOneAndUpdate(
+      { email },
+      {
+        $push: {
+          joined_pools: {
+            id: poolId,
+            driver_phone: pool.driver_phone,
+            driver_email: pool.driver_email,
+            driver_fcms: pool.driver_fcms,
+            pickupLocation: pool.pickupLocation,
+            dropoffLocation: pool.dropoffLocation,
+            startTime: pool.startTime,
+          },
+        },
+      },
+      { new: true }
+    );
+    // Add user to the pool's passengers list
+    const updatedPool = await Rides.findByIdAndUpdate(
+      poolId,
+      {
+        $push: {
+          passengers: {
+            id: email,
+            name: user.name,
+            phoneNumber: user.phone,
+            email: user.email,
+            fcmToken: user.fcmToken, // Add FCM token of the user
+          },
+        },
+        $inc: { seats_available: -1 }, // Decrease available seats
+      },
+      { new: true }
+    );
+    // Send FCM notifications to driver and user
+    const driverFCMToken = pool.driver_fcms;
+    const passengerFCMToken = user.fcmToken;
+    const message = `You have successfully joined the pool with driver ${pool.driver_email}.`;
+    sendNotificationToDriverAndPassenger(driverFCMToken, updatedPool.seats_available,  passengerFCMToken, message);
+    res.json({
+      message: 'Successfully joined pool',
+      user: updatedUser,
+      pool: updatedPool,
+    });
+  } catch (error) {
+    console.error('Error in joining pool:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
   }
+                          
 });
 
 router.get('/mypools/:email', async (req, res) => {
@@ -159,61 +385,125 @@ router.get('/mypools/:email', async (req, res) => {
   }
 });
 
+// Delete a pool by Driver
 router.delete('/pool/:id', async (req, res) => {
   try {
-      const id = req.params.id;
-      const response = await Rides.findByIdAndDelete(id).exec();
-      if (!response) {
-          return res.status(404).json({ message: 'Pool not found' });
-      }
-      res.status(200).json({ message: 'Pool deleted successfully' });
+    const id = req.params.id;
+    console.log(id);
+
+    // Find the pool to retrieve passenger and driver data
+    const pool = await Rides.findById(id).exec();
+    if (!pool) {
+      return res.status(404).json({ message: 'Pool not found' });
+    }
+
+    // Driver information
+    const driver = {
+      name: pool.driver, // Assuming the driver's name is stored in the pool
+    };
+
+    // Notify passengers that the driver has canceled the ride
+    const passengers = pool.passengers || [];
+    const notificationPromises = passengers.map((passenger) =>
+      sendDriverCancelNotification(passenger.fcms_Token, pool, driver)
+    );
+
+    // Wait for all notifications to be sent
+    await Promise.all(notificationPromises);
+
+    // Remove the ride from all passengers joined pools
+    const passengersIds = passengers.map(passenger => passenger._id);
+    const users = await User.find({ _id: { $in: passengersIds } });
+    const userPromises = users.map(user => User.findByIdAndUpdate(user._id, 
+      {
+        $pull: {
+          joined_pools: { id: pool._id },
+        },
+      }, 
+      { new: true }
+    ));
+    await Promise.all(userPromises);
+
+    // Delete the pool
+    const response = await Rides.findByIdAndDelete(id).exec();
+    if (!response) {
+      return res.status(404).json({ message: 'Pool not found' });
+    }
+
+    res.status(200).json({ message: 'Pool deleted successfully' });
   } catch (error) {
-      console.log(error);
-      res.status(500).json({ message: 'Failed to delete pool', error });
-  }
-});
-// POST: Add a passenger to a pool
-router.post('/add-passenger', async (req, res) => {
-  try {
-      const { poolId, email } = req.body;
-      const response = await Rides.findByIdAndUpdate(
-          poolId,
-          {
-              $push: {
-                  passengers: {
-                      id: email,
-                      name: req.body.name,
-                      phoneNumber: req.body.phoneNumber,
-                      email: req.body.email,
-                  },
-              },
-          },
-          { new: true } // returns the updated document
-      );
-      res.status(200).json(response);
-  } catch (error) {
-      res.status(500).json({ message: 'Failed to add passenger', error });
+    console.log(error);
+    res.status(500).json({ message: 'Failed to delete pool', error });
   }
 });
 
-// DELETE: Remove a passenger from a pool
-router.delete('/remove-passenger', async (req, res) => {
+// POST: Add a passenger to a pool
+
+router.delete('/leave-pool', async (req, res) => {
   try {
-      const { poolId, email } = req.body;
-      const response = await Rides.findByIdAndUpdate(
-          poolId,
-          {
-              $pull: {
-                  passengers: {
-                      id: email,
-                  },
-              },
-          },
-          { new: true } // returns the updated document
-      );
-      res.status(200).json(response);
+    const { poolId, email } = req.body;
+
+    console.log(`Received request to leave pool ${poolId} from user ${email}`);
+
+    // Step 1: Find the pool and check if the user is in the passengers list
+    const pool = await Rides.findById(poolId);
+    if (!pool) {
+      console.log(`Pool ${poolId} not found`);
+      return res.status(404).json({ message: 'Pool not found' });
+    }
+
+    console.log(`Pool ${poolId} found, checking if user ${email} is in the passengers list`);
+
+    // Check if the user is in the passengers array
+    const passengerIndex = pool.passengers.findIndex(passenger => passenger.email === email);
+    if (passengerIndex === -1) {
+      console.log(`User ${email} not in the pool`);
+      return res.status(400).json({ message: 'User not in the pool' });
+    }
+
+    console.log(`User ${email} found in the pool, removing from passengers list`);
+
+    // Step 2: Remove the user from the pool's passengers list
+    pool.passengers.splice(passengerIndex, 1);
+
+    pool.seats_available += 1;
+
+    console.log(`Pool updated, saving`);
+
+    // Save the updated pool
+    await pool.save();
+
+    console.log(`Pool saved, removing pool from user's joined_pools array`);
+
+    // Step 3: Remove the pool from the user's joined_pools array
+    const user = await User.findOneAndUpdate(
+      { email: email },
+      { $pull: { joined_pools: { id: poolId } } },
+      { new: true }
+    );
+
+    if (!user) {
+      console.log(`User ${email} not found`);
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    console.log(`User ${email} found, sending notifications`);
+
+    // Step 4: Send a notification to the driver and the user (if needed)
+    sendLeavePoolNotification(pool.driver_fcms, pool, user);
+    sendLeavePoolNotification(user.fcmToken, pool, user);
+
+    console.log(`Notifications sent, returning response`);
+
+    // Return a response indicating success
+    res.status(200).json({
+      message: 'User successfully left the pool',
+      pool,
+      user,
+    });
   } catch (error) {
-      res.status(500).json({ message: 'Failed to remove passenger', error });
+    console.error(`Error in leaving pool: ${error}`);
+    res.status(500).json({ message: 'Failed to leave pool', error });
   }
 });
 
@@ -276,96 +566,102 @@ router.get('/user/joined-pools/:email', async (req, res) => {
   try {
     const user = await User.findOne({ email: req.params.email });
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: 'User not found', joinedPools: [] });
     }
     
     // Fetch all rides that the user has joined
-    const joinedRides = await Rides.find({ _id: { $in: user.joined_pools } });
-    res.json(joinedRides);
+    const joinedPools = await Rides.find({ 
+      '_id': { $in: user.joined_pools.map(pool => pool.id) } 
+    });
+
+    res.json(joinedPools);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching joined pools:', error);
+    res.status(500).json({ 
+      message: 'Failed to fetch joined pools', 
+      error: error.message,
+      joinedPools: [] 
+    });
   }
 });
 
-// Join a pool
-router.post('/user/join-pool', async (req, res) => {
+// Function to send notification when a passenger is removed
+async function sendRemovePassengerNotification(fcmToken, pool, message) {
+  const payload = {
+    notification: {
+      title: 'Passenger Removed',
+      body: message,
+    },
+    token: fcmToken,
+  };
+
+  console.log(`Sending notification: ${message}`);
   try {
-    const { email, poolId } = req.body;
-    
-    // Check if pool exists and has available seats
+    await admin.messaging().send(payload);
+    console.log('Notification sent successfully');
+  } catch (error) {
+    console.error('Error sending notification:', error);
+  }
+}
+
+// DELETE: Remove a passenger from a pool
+router.delete('/remove-passenger', async (req, res) => {
+  try {
+    const { poolId, email } = req.body;
+
+    // Step 1: Find the pool and get the passenger info (needed for notifications)
     const pool = await Rides.findById(poolId);
     if (!pool) {
       return res.status(404).json({ message: 'Pool not found' });
     }
 
-    if (pool.seats_available <= 0) {
-      return res.status(400).json({ message: 'No seats available in this pool' });
-    }
-
-    // Get user details
-    const user = await User.findOneAndUpdate(
-      { email },
-      { $addToSet: { joined_pools: poolId } },
+    // Step 2: Remove the passenger from the ride
+    const updatedPool = await Rides.findByIdAndUpdate(
+      poolId,
+      {
+        $pull: {
+          passengers: { email: email },
+        },
+        $inc: { seats_available: 1 }, // Increment seats available when a passenger leaves
+      },
       { new: true }
     );
 
+    // Step 3: Remove the pool from the user's joined_pools
+    const user = await User.findOneAndUpdate(
+      { email },
+      {
+        $pull: {
+          joined_pools: { id: poolId },
+        },
+      },
+      { new: true }
+    );
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Decrease available seats
-    const updatedPool = await Rides.findByIdAndUpdate(
-      poolId,
-      { $inc: { seats_available: -1 } },
-      { new: true }
-    );
+    // Step 4: Send notification to the user and driver
+    const userFcmToken = user.fcmToken; // User's FCM token for notification
+    const driverFcmToken = pool.driver_fcms; // Driver's FCM token for notification
 
-    // Send email notification
-    sendJoinPoolEmail(updatedPool, user, updatedPool.seats_available);
-
-    res.json({ 
-      message: 'Successfully joined pool', 
-      user,
-      pool: updatedPool
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Leave a pool
-router.delete('/user/leave-pool', async (req, res) => {
-  try {
-    const { email, poolId } = req.body;
-    
-    // Get user details first
-    const user = await User.findOneAndUpdate(
-      { email },
-      { $pull: { joined_pools: poolId } },
-      { new: true }
-    );
-
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+    // Send notifications
+    if (userFcmToken) {
+      await sendRemovePassengerNotification(
+        userFcmToken, 
+        pool, 
+        `You have been removed from the pool from ${pool.pickupLocation} to ${pool.dropoffLocation} on ${pool.date} at ${pool.startTime}. The driver's phone number is ${pool.driver_phone}.`
+      );
     }
-
-    // Increase available seats when user leaves
-    const updatedPool = await Rides.findByIdAndUpdate(
-      poolId,
-      { $inc: { seats_available: 1 } },
-      { new: true }
-    );
-
-    // Send email notification
-    sendLeavePoolEmail(updatedPool, user, updatedPool.seats_available);
-
-    res.json({ 
-      message: 'Successfully left pool', 
+    // Send the updated pool data as response
+    res.status(200).json({
+      message: 'Passenger removed successfully',
+      updatedPool,
       user,
-      pool: updatedPool
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error removing passenger:', error);
+    res.status(500).json({ message: 'Failed to remove passenger', error: error.message });
   }
 });
 

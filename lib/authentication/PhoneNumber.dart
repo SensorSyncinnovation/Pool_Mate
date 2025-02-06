@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:pool_mate/authentication/OTPVerification.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../Constants.dart';
 import 'package:pool_mate/ride/selection.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -32,75 +33,100 @@ class _SignUpScreenState extends State<SignUpScreen> {
     await _checkVerificationInBackground();
   }
 
-  Future<void> sendOtp(
-      String phoneNumber, String email, BuildContext context) async {
-    print("Attempting to send OTP - Phone: $phoneNumber, Email: $email");
+ 
+Future<void> sendOtp(
+    String phoneNumber, String email, BuildContext context) async {
+  print("Attempting to send OTP - Phone: $phoneNumber, Email: $email");
 
-    setState(() {
-      _isLoading = true;
-    });
+  setState(() {
+    _isLoading = true;
+  });
 
-    try {
-      final url = '${APIConstants.baseUrl}/email';
-      print("Making OTP request to: $url");
+  try {
+    // Get the FCM token
+    final FirebaseMessaging messaging = FirebaseMessaging.instance;
+    String? fcmToken = await messaging.getToken();
 
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'phone': phoneNumber,
-          'email': email,
-        }),
-      );
-
-      print("OTP Response Status: ${response.statusCode}");
-      print("OTP Response Body: ${response.body}");
-
-      if (response.statusCode == 200) {
-        print("OTP sent successfully");
-        if (!mounted) return;
-
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PhoneVerificationScreen(
-              phoneNumber: phoneNumber,
-              email: email,
-            ),
-          ),
-        );
-      } else {
-        print("Failed to send OTP: ${response.statusCode}");
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to send OTP. Status: ${response.statusCode}'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
-    } catch (e) {
-      print("Error sending OTP: $e");
+    if (fcmToken == null) {
+      print("Failed to retrieve FCM token.");
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Network error: $e'),
+        const SnackBar(
+          content: Text('Failed to retrieve FCM token. Please try again.'),
           backgroundColor: Colors.red,
           duration: Duration(seconds: 3),
         ),
       );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+
+    print("FCM Token: $fcmToken");
+
+    final url = '${APIConstants.baseUrl}/email';
+    print("Making OTP request to: $url");
+
+    // Make the request with the FCM token
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'phone': phoneNumber,
+        'email': email,
+        'fcmToken': fcmToken, // Include the FCM token
+      }),
+    );
+
+    print("OTP Response Status: ${response.statusCode}");
+    print("OTP Response Body: ${response.body}");
+
+    if (response.statusCode == 200) {
+      print("OTP sent successfully");
+      if (!mounted) return;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PhoneVerificationScreen(
+            phoneNumber: phoneNumber,
+            email: email,
+          ),
+        ),
+      );
+    } else {
+      print("Failed to send OTP: ${response.statusCode}");
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to send OTP. Status: ${response.statusCode}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  } catch (e) {
+    print("Error sending OTP: $e");
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Network error: $e'),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
-
+}
   Future<void> _checkVerificationInBackground() async {
     print("Starting verification check");
     if (!mounted) {

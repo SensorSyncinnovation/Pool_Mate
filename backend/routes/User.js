@@ -7,7 +7,7 @@ const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
-
+const admin = require('../firebase');
 const SECRET_KEY = "_secret_"; // Replace with a secure key in production
 const my_email = "sensorsyncinnovation@gmail.com";
 // Configure Nodemailer
@@ -43,7 +43,7 @@ const upload = multer({ storage });
 router.post('/email', async (req, res) => {
   try {
     console.log(req.body);
-    const { email, phone } = req.body;
+    const { email, phone, fcmToken } = req.body;
 
     if (!email || !phone) {
       return res.status(400).json({ message: 'Email and phone are required' });
@@ -53,23 +53,25 @@ router.post('/email', async (req, res) => {
     let user = await User.findOne({ email: email });
     const otp = crypto.randomInt(100000, 999999);
     if (!user) {
-      // Create a new user with OTP and phone
+      // Create a new user with OTP, phone, and FCM token
       user = new User({
         email,
         phone,
         otp,
+        fcmToken, // Save FCM token
         isDriver: false, // Initially not verified
-        joined_pools:[],
+        joined_pools: [],
         otp_expires_at: new Date(Date.now() + 5 * 60 * 1000), // OTP expires in 5 minutes
       });
 
       await user.save();
     } else {
-      // Update OTP for existing user
+      // Update OTP and FCM token for existing user
       user.otp = otp;
       user.otp_expires_at = new Date(Date.now() + 5 * 60 * 1000); // OTP expires in 5 minutes
-      await user.save().then(()=>{console.log("user saved successfully");
-      });
+      user.fcmToken = fcmToken; // Update FCM token
+      await user.save();
+      console.log("User updated successfully");
     }
 
     // Send OTP via email
@@ -112,15 +114,48 @@ router.post('/verify', async (req, res) => {
 
     user.otp = null; // Clear OTP after successful verification
     await user.save();
+
     // Generate JWT
-    const token = jwt.sign({ id: user._id, email: user.email , phoneNumber:user.phone }, SECRET_KEY);
-    let documents  = true
-    if(!user.Aadhar_url || !user.License_url){
-      documents = false
+    const token = jwt.sign(
+      { id: user._id, email: user.email, phoneNumber: user.phone },
+      SECRET_KEY
+    );
+
+    let documents = true;
+    if (!user.Aadhar_url || !user.License_url) {
+      documents = false;
     }
-    // Set the token as a cookie without expiration and without httpOnly and secure
+
+    // Send notification (FCM)
+    if (user.fcmToken) {
+      const message = {
+        notification: {
+          title: 'Welcome to Poolmate!',
+          body: `Hi ${email}, we're excited to have you on board!`,
+        },
+        token: user.fcmToken,
+      };
+
+      try {
+        await admin.messaging().send(message);
+        console.log('Notification sent successfully to:', user.fcmToken);
+      } catch (error) {
+        console.error('Error sending notification:', error);
+      }
+    } else {
+      console.warn('No FCM token available for this user.');
+    }
+
+    // Set the token as a cookie without expiration
     res.cookie('token', token);
-    return res.status(200).json({ message: 'OTP verified successfully' , token :token , email:user.email , phoneNumber:user.phone , isDriver:user.isDriver , documents:documents , doucments:documents});
+    return res.status(200).json({
+      message: 'OTP verified successfully',
+      token,
+      email: user.email,
+      phoneNumber: user.phone,
+      isDriver: user.isDriver,
+      documents,
+    });
   } catch (error) {
     console.error('Error in /verify route:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -180,7 +215,6 @@ router.post('/license', upload.fields([{ name: 'aadhaar' }, { name: 'license' }]
   }
 });
 // GET: Check if User is Verified using JWT from Cookies
-
 
 router.all('/is-verified', async (req, res) => {
   try {
