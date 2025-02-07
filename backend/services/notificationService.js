@@ -1,12 +1,14 @@
 const admin = require('firebase-admin');
 const Notification = require('../models/NotificationSchema');
+const User = require('../models/UserSchema'); // Ensure you import User schema
 
-// Initialize Firebase Admin SDK
-// Note: You'll need to add your Firebase service account key file
-admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
-    // Add your Firebase project configuration here
-});
+// Check if Firebase is already initialized
+if (!admin.apps.length) {
+    admin.initializeApp({
+        credential: admin.credential.applicationDefault(),
+        // Add other Firebase configurations if needed
+    });
+}
 
 const notificationService = {
     async sendNotification(userId, title, message, data = {}) {
@@ -21,27 +23,22 @@ const notificationService = {
             });
             await notification.save();
 
-            // Get user's FCM token (you'll need to add this to your UserSchema)
+            // Get user's FCM token
             const user = await User.findById(userId);
             if (!user || !user.fcmToken) {
                 console.log('User not found or FCM token not available');
                 return;
             }
 
-            // Send FCM notification
-            const message = {
-                notification: {
-                    title,
-                    body: message
-                },
-                data: {
-                    ...data,
-                    notificationId: notification._id.toString()
-                },
+            // Prepare FCM notification
+            const fcmMessage = {
+                notification: { title, body: message },
+                data: { ...data, notificationId: notification._id.toString() },
                 token: user.fcmToken
             };
 
-            const response = await admin.messaging().send(message);
+            // Send notification
+            const response = await admin.messaging().send(fcmMessage);
             console.log('Successfully sent notification:', response);
             return notification;
         } catch (error) {
@@ -52,7 +49,7 @@ const notificationService = {
 
     async getNotifications(userId) {
         return await Notification.find({ recipient: userId })
-            .sort({ created_at: -1 });
+            .sort({ createdAt: -1 }); // Ensure the field name matches your schema
     },
 
     async markAsRead(notificationId) {
