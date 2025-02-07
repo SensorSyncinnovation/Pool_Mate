@@ -9,6 +9,7 @@ if (!admin.apps.length) {
         // Add other Firebase configurations if needed
     });
 }
+//commit
 
 const notificationService = {
     async sendNotification(userId, title, message, data = {}) {
