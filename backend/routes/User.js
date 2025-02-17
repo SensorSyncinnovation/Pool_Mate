@@ -11,6 +11,12 @@ const admin = require('../firebase');
 const SECRET_KEY = "_secret_"; // Replace with a secure key in production
 const my_email = "sensorsyncinnovation@gmail.com";
 // Configure Nodemailer
+const twilio = require("twilio");
+
+// Twilio credentials
+const accountSid = "ACb79a7e3ceb5ece9335ede51125f8128c";
+const authToken = "1150e1ce626e02b9729c7eded26dbdc4";
+const client = twilio(accountSid, authToken);
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -52,45 +58,49 @@ router.post('/email', async (req, res) => {
     // Check if the user exists
     let user = await User.findOne({ email: email });
     const otp = crypto.randomInt(100000, 999999);
+    
     if (!user) {
       // Create a new user with OTP, phone, and FCM token
       user = new User({
         email,
         phone,
         otp,
-        fcmToken, // Save FCM token
-        isDriver: false, // Initially not verified
+        fcmToken, 
+        isDriver: false, 
         joined_pools: [],
-        otp_expires_at: new Date(Date.now() + 5 * 60 * 1000), // OTP expires in 5 minutes
+        otp_expires_at: new Date(Date.now() + 5 * 60 * 1000),
       });
-
       await user.save();
     } else {
       // Update OTP and FCM token for existing user
       user.otp = otp;
-      user.otp_expires_at = new Date(Date.now() + 5 * 60 * 1000); // OTP expires in 5 minutes
-      user.fcmToken = fcmToken; // Update FCM token
+      user.otp_expires_at = new Date(Date.now() + 5 * 60 * 1000);
+      user.fcmToken = fcmToken; 
       await user.save();
       console.log("User updated successfully");
     }
 
-    // Send OTP via email
-    const mailOptions = {
-      from: my_email,
-      to: email,
-      subject: 'Your OTP for Verification',
-      text: `Your OTP is ${otp}. It is valid for 5 minutes.`,
-    };
+    // Send OTP via SMS using Twilio
+    const recipientPhone = phone.startsWith('+91') ? phone : `+91${phone}`;
 
-    await transporter.sendMail(mailOptions);
+    try {
+      const message = await client.messages.create({
+        body: `Your OTP for verification is ${otp}. It is valid for 5 minutes.`,
+        from: "+15673444075", // Replace with your Twilio phone number
+        to: recipientPhone,
+      });
+      console.log(`OTP sent via SMS with SID: ${message.sid}`);
+    } catch (error) {
+      console.error(`Failed to send OTP via SMS: ${error.message}`);
+      return res.status(500).json({ message: 'Failed to send OTP via SMS' });
+    }
 
-    return res.status(200).json({ message: 'OTP sent to email successfully' });
+    return res.status(200).json({ message: 'OTP sent via SMS successfully' });
   } catch (error) {
-    console.error('Error during email verification:', error);
+    console.error('Error during OTP process:', error);
     return res.status(500).json({ message: 'Internal server error' });
   }
 });
-
 // POST: Verify OTP and Generate JWT
 router.post('/verify', async (req, res) => {
   try {
