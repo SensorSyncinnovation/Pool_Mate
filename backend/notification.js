@@ -1,24 +1,22 @@
-const admin = require('firebase-admin');
+// Install Twilio SDK: npm install twilio
+const twilio = require("twilio");
 
-// Initialize Firebase Admin SDK
-const serviceAccount = require('./service.json');
+// Replace these values with your actual Twilio credentials
+const accountSid = "ACb79a7e3ceb5ece9335ede51125f8128c";
+const authToken = "1150e1ce626e02b9729c7eded26dbdc4";
+const client = twilio(accountSid, authToken);
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+// Send an SMS
+async function sendSms() {
+  try {
+    const message = await client.messages.create({
+      body: "Hello, this is a test message from Twilio!",
+      from: "+15673444075", // Replace with your Twilio phone number
+      to: "+918019570982"   // Replace with the recipient's phone number
+    });    console.log(`Message sent with SID: ${message.sid}`);
+  } catch (error) {
+    console.error(`Failed to send SMS: ${error.message}`);
+  }
+}
 
-const message = {
-  notification: {
-    title: 'Hello!',
-    body: 'This is a test notification.',
-  },
-  token: 'fQWFHMD2RQ2lciaJHu-VZ5:APA91bH4t3I9N9TXOWYPB7VnWxvnC4qreUW9zG136SgBG90QvjHFL_xRCFifJ_3_xj3U47ZlATrz7rUEgG5sCmYMW98AR512_R19tOVZe-QimaqWizD9q-E', // Your FCM Token
-};
-
-admin.messaging().send(message)
-  .then((response) => {
-    console.log('Successfully sent message:', response);
-  })
-  .catch((error) => {
-    console.error('Error sending message:', error);
-  });
+sendSms();
