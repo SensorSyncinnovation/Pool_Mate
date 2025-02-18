@@ -233,73 +233,67 @@ router.post('/rides', async (req, res) => {
 router.post('/findride', async (req, res) => {
   const { pickupLocation, dropoffLocation, email } = req.body;
   try {
+    console.log(`Received request to find ride from ${pickupLocation} to ${dropoffLocation} for user ${email}`);
+
     // Get current date and time
-    const currentDate = new Date();
-    const currentDateString = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
-    const currentTime = currentDate.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit', 
-      hour12: true 
-    });
+    const now = new Date();
+    const currentDateString = now.toISOString().split('T')[0];
 
-    // Fetch all rides from the database
-    const rides = await Rides.find().exec();
-    console.log('Fetched rides:', rides);
+    console.log('Current DateTime:', now);
+    console.log('Current Date String:', currentDateString);
 
-    const validRides = [];
+    // Fetch rides from database
+    const rides = await Rides.find({
+      pickupLocation,
+      dropoffLocation,
+      date: { $gte: currentDateString }
+    }).exec();
 
-    rides.forEach((ride) => {
-      // Log ride data for debugging
-      // console.log('Checking ride:', ride);
+    console.log(`Fetched ${rides.length} rides from database`);
 
-      // Ensure pickup and dropoff locations match
-      if (ride.pickupLocation === pickupLocation && ride.dropoffLocation === dropoffLocation) {
-        console.log(`Ride matches location: ${ride.pickupLocation} -> ${ride.dropoffLocation}`);
-        // Convert the ride's start time to a Date object for comparison
-        const [rideHours, rideMinutes] = ride.startTime.split(' ')[0].split(':');
-        const rideAMPM = ride.startTime.split(' ')[1];
-        const rideDate = new Date(currentDate);
-        rideDate.setHours(rideAMPM === 'PM' ? parseInt(rideHours) + 12 : parseInt(rideHours));
-        rideDate.setMinutes(parseInt(rideMinutes));
-        
-        const currentTimeDate = new Date(currentDate);
-        const [currentHours, currentMinutes] = currentTime.split(':');
-        const currentAMPM = currentTime.split(' ')[1];
-        currentTimeDate.setHours(currentAMPM === 'PM' ? parseInt(currentHours) + 12 : parseInt(currentHours));
-        currentTimeDate.setMinutes(parseInt(currentMinutes));
+    const validRides = rides.filter(ride => {
+      // Log the ride being checked
+      console.log(`Checking ride: date=${ride.date}, startTime=${ride.startTime}, pickup=${ride.pickupLocation}, dropoff=${ride.dropoffLocation}`);
 
-        console.log(`Ride time: ${ride.startTime}, Current time: ${currentTime}`);
-        console.log('Converted ride time:', rideDate, "   Converted current time:", currentTimeDate);
-
-        // Compare the ride's start date and time
-        if (ride.date >= currentDateString && rideDate > currentTimeDate) {
-          console.log('Ride time is greater than current time');
-
-          // Check if the user is not already a passenger or the driver
-          const isPassenger = ride.passengers.some((passenger) => passenger.email === email);
-          const isDriver = ride.driver_email === email;
-          
-          if (!isPassenger && !isDriver) {
-            validRides.push(ride); // Add valid rides to the list
-            console.log('Added valid ride:', ride);
-          }
-        } else {
-          console.log('Current time is greater than ride time or ride is in the past');
-        }
-      } else {
-        console.log(`Ride of ${pickupLocation}-> ${dropoffLocation} does not match the location: ${ride.pickupLocation} -> ${ride.dropoffLocation}`);
+      // Parse ride date and time
+      const [hours, minutes] = ride.startTime.split(':');
+      const period = ride.startTime.split(' ')[1].toUpperCase();
+      
+      // Create a date object for the ride time
+      const rideDateTime = new Date(ride.date);
+      
+      // Convert to 24-hour format
+      let hours24 = parseInt(hours);
+      if (period === 'PM' && hours24 !== 12) {
+        hours24 += 12;
+      } else if (period === 'AM' && hours24 === 12) {
+        hours24 = 0;
       }
+      
+      rideDateTime.setHours(hours24, parseInt(minutes), 0, 0);
+      
+      console.log(`Comparing times: rideDateTime=${rideDateTime}, currentDateTime=${now}, isInFuture=${rideDateTime > now}`);
+
+      // Check if user is not already a passenger
+      const isNotPassenger = !ride.passengers.some(passenger => passenger.email === email);
+
+      console.log(`Checking if user ${email} is not already a passenger: ${isNotPassenger}`);
+
+      // Return true if ride is in future and user is not a passenger
+      return rideDateTime > now && isNotPassenger;
     });
 
-    // Send valid rides as response
-    console.log('Valid rides found:', validRides);
-    res.status(200).json(validRides);  
+    console.log(`Valid rides found: ${validRides.length}`);
+    res.status(200).json(validRides);
+
   } catch (error) {
     console.error('Error finding rides:', error);
-    res.status(500).json({ error: 'Something went wrong while finding rides' });
+    res.status(500).json({ 
+      error: 'Something went wrong while finding rides',
+      details: error.message 
+    });
   }
 });
-
 
 router.post('/join-pool', async (req, res) => {
   try {
@@ -475,10 +469,23 @@ router.delete('/leave-pool', async (req, res) => {
 
     console.log(`Pool saved, removing pool from user's joined_pools array`);
 
-    // Step 3: Remove the pool from the user's joined_pools array
+    // Step 3: Remove the pool from the user's joined_pools array and add to history
     const user = await User.findOneAndUpdate(
       { email: email },
-      { $pull: { joined_pools: { id: poolId } } },
+      { 
+        $pull: { joined_pools: { id: poolId } },
+        $push: { 
+          history: {
+            id: pool._id,
+            driver_phone: pool.driver_phone,
+            driver_email: pool.driver_email,
+            driver_fcms: pool.driver_fcms,
+            pickupLocation: pool.pickupLocation,
+            dropoffLocation: pool.dropoffLocation,
+            startTime: pool.startTime
+          }
+        }
+      },
       { new: true }
     );
 

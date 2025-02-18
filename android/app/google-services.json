@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "515927920109",
-    "project_id": "pool-mate-f4173",
-    "storage_bucket": "pool-mate-f4173.firebasestorage.app"
+    "project_number": "1028659766533",
+    "project_id": "poolmate-8d3de",
+    "storage_bucket": "poolmate-8d3de.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:515927920109:android:9fb34c2db4150f240e2be4",
+        "mobilesdk_app_id": "1:1028659766533:android:ccf4b2a56b49862e22436c",
         "android_client_info": {
           "package_name": "com.poolmate.app"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDkduo3iRHbs-ttMSDk27iySXAGDJYueoM"
+          "current_key": "AIzaSyDIGZgmGbvTFNTkVcnJyy6_wejBVygtlF4"
         }
       ],
       "services": {

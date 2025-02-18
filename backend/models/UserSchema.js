@@ -20,7 +20,15 @@ const UserSchema = mongoose.Schema({
         dropoffLocation: String,
         startTime: String,
     }],
-    history:[String],
+    history:[{
+        id:String,
+        driver_phone:String,
+        driver_email:String,
+        driver_fcms: String,
+        pickupLocation: String,
+        dropoffLocation: String,
+        startTime: String,
+    }],
     updated_at: { type: Date, default: Date.now }
 })
 
