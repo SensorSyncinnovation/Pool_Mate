@@ -4,57 +4,65 @@ import 'dart:convert';
 import '../Constants.dart';
 
 class JoinedPoolsPage extends StatefulWidget {
-  final List<dynamic> joinedPools;
   final String userEmail;
   final String userPhone;
   final String? starting;
   final String? destination;
-  JoinedPoolsPage({
-    required this.joinedPools,
+
+  const JoinedPoolsPage({
+    Key? key,
     required this.userEmail,
     required this.userPhone,
-    required this.starting,
-    required this.destination,
-  });
+    this.starting,
+    this.destination,
+  }) : super(key: key);
 
   @override
   _JoinedPoolsPageState createState() => _JoinedPoolsPageState();
 }
 
-class _JoinedPoolsPageState extends State<JoinedPoolsPage> {
-  List<dynamic> _pools = [];
-  bool _isLoading = false;
+class _JoinedPoolsPageState extends State<JoinedPoolsPage> with SingleTickerProviderStateMixin {
+  List<dynamic> _joinedPools = [];
+  List<dynamic> _history = [];
+  bool _isLoading = true;
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    print(widget.starting);
-    print(widget.destination);
-    _pools = List.from(widget.joinedPools);
-    _fetchJoinedPools();
+    _tabController = TabController(length: 2, vsync: this);
+    _fetchJoinedPoolsAndHistory();
   }
 
-  Future<void> _fetchJoinedPools() async {
-    setState(() {
-      _isLoading = true;
-    });
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchJoinedPoolsAndHistory() async {
+    setState(() => _isLoading = true);
+    
     try {
       final response = await http.get(
-        Uri.parse(
-            '${APIConstants.baseUrl}/user/joined-pools/${widget.userEmail}'),
+        Uri.parse('${APIConstants.baseUrl}/user/joined-pools/${widget.userEmail}'),
       );
-      print(response.body);
+
       if (response.statusCode == 200) {
+        final data = json.decode(response.body);
         setState(() {
-          _pools = json.decode(response.body);
+          _joinedPools = data['joinedPools'] ?? [];
+          _history = data['history'] ?? [];
           _isLoading = false;
         });
+      } else {
+        throw Exception('Failed to fetch data');
       }
     } catch (e) {
-      print('Error fetching joined pools: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error fetching rides: ${e.toString()}')),
+      );
     }
   }
 
@@ -68,161 +76,217 @@ class _JoinedPoolsPageState extends State<JoinedPoolsPage> {
           'poolId': poolId,
         }),
       );
-      print(response.body);
+
       if (response.statusCode == 200) {
         setState(() {
-          _pools.removeWhere((pool) => pool['_id'] == poolId);
+          _joinedPools.removeWhere((pool) => pool['_id'] == poolId);
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Successfully left the pool')),
+          const SnackBar(content: Text('Successfully left the ride')),
         );
+      } else {
+        throw Exception('Failed to leave pool');
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error leaving pool: $e')),
+        SnackBar(content: Text('Error leaving ride: ${e.toString()}')),
       );
     }
+  }
+
+  Widget _buildRideCard(dynamic ride, bool isHistory) {
+    final DateTime rideDate = DateTime.parse(ride['startTime'] ?? DateTime.now().toIso8601String());
+    final String formattedDate = '${rideDate.day}/${rideDate.month}/${rideDate.year} ${rideDate.hour}:${rideDate.minute}';
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade300),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'From: ${ride['pickupLocation']}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'To: ${ride['dropoffLocation']}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!isHistory)
+                  IconButton(
+                    icon: const Icon(Icons.exit_to_app, color: Colors.red),
+                    onPressed: () => _showLeaveDialog(ride['_id']),
+                  ),
+              ],
+            ),
+            const Divider(height: 24),
+            _buildDetailRow(Icons.person, 'Driver', ride['driver'] ?? 'N/A'),
+            _buildDetailRow(Icons.access_time, 'Date & Time', formattedDate),
+            _buildDetailRow(Icons.attach_money, 'Cost', '₹${ride['cost'] ?? 'N/A'}'),
+            if (!isHistory) ...[
+              _buildDetailRow(
+                Icons.group,
+                'Passengers',
+                '${ride['passengers']?.length ?? 0}/${(ride['seats_available'] ?? 0) + (ride['passengers']?.length ?? 0)}',
+              ),
+              _buildDetailRow(Icons.phone, 'Driver Contact', ride['driver_phone'] ?? 'N/A'),
+              _buildDetailRow(Icons.info_outline, 'Status', ride['status'] ?? 'Active'),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Colors.grey[600]),
+          const SizedBox(width: 8),
+          Text(
+            '$label: ',
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 14,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: Colors.black87,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showLeaveDialog(String poolId) {
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Leave Ride'),
+        content: const Text('Are you sure you want to leave this ride?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _leavePool(poolId);
+            },
+            child: const Text(
+              'Leave',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabContent(List<dynamic> items, bool isHistory) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (items.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isHistory ? Icons.history : Icons.directions_car,
+              size: 64,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isHistory ? 'No ride history' : 'No active rides',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: items.length,
+      itemBuilder: (context, index) => _buildRideCard(items[index], isHistory),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text('My Rides',
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'My Rides',
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: IconThemeData(color: Colors.black),
+        iconTheme: const IconThemeData(color: Colors.black),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _fetchJoinedPools,
+            onPressed: _fetchJoinedPoolsAndHistory,
           ),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: Colors.black,
+          unselectedLabelColor: Colors.grey,
+          indicatorColor: Colors.blue,
+          tabs: const [
+            Tab(text: 'Active Rides'),
+            Tab(text: 'History'),
+          ],
+        ),
       ),
-      body: _isLoading && _pools.isEmpty
-          ? Center(child: CircularProgressIndicator())
-          : _pools.isEmpty
-              ? Center(
-                  child: Text(
-                    'No rides yet',
-                    style: TextStyle(fontSize: 20, color: Colors.grey),
-                  ),
-                )
-              : ListView.builder(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  itemCount: _pools.length,
-                  itemBuilder: (context, index) {
-                    final pool = _pools[index];
-                    return Card(
-                      margin: EdgeInsets.symmetric(vertical: 8),
-                      color: Colors.white,
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: Colors.grey.shade300, width: 1),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    '${pool['pickupLocation']} → ${pool['dropoffLocation']}',
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: Icon(Icons.delete, color: Colors.red),
-                                  onPressed: () => showDialog(
-                                    context: context,
-                                    builder: (context) => AlertDialog(
-                                      title: Text('Leave Ride',
-                                          style:
-                                              TextStyle(color: Colors.black)),
-                                      content: Text(
-                                          'Are you sure you want to leave this ride?',
-                                          style:
-                                              TextStyle(color: Colors.black)),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context),
-                                          child: Text('Cancel',
-                                              style: TextStyle(
-                                                  color: Colors.black)),
-                                        ),
-                                        TextButton(
-                                          onPressed: () {
-                                            Navigator.pop(context);
-                                            _leavePool(pool['_id']);
-                                          },
-                                          child: Text('Leave',
-                                              style:
-                                                  TextStyle(color: Colors.red)),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 12),
-                            _buildRideDetailRow('Driver', pool['driver']),
-                            _buildRideDetailRow('Date', pool['startTime']),
-                            _buildRideDetailRow('Cost', '₹${pool['cost']}'),
-                            _buildRideDetailRow('Status', pool['status']),
-                            SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Passengers: ${pool['passengers'].length}/${pool['seats_available'] + pool['passengers'].length}',
-                                  style: TextStyle(
-                                      color: Colors.grey[700], fontSize: 14),
-                                ),
-                                Text(
-                                  'Driver Contact: ${pool['driver_phone']}',
-                                  style: TextStyle(
-                                      color: Colors.grey[700], fontSize: 14),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-    );
-  }
-
-  Widget _buildRideDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: TabBarView(
+        controller: _tabController,
         children: [
-          Text(
-            label,
-            style: TextStyle(color: Colors.grey[600], fontSize: 14),
-          ),
-          Text(
-            value,
-            style: TextStyle(color: Colors.black87, fontSize: 14),
-          ),
+          _buildTabContent(_joinedPools, false),
+          _buildTabContent(_history, true),
         ],
       ),
     );
