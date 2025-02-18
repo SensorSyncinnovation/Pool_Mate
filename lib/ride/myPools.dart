@@ -63,10 +63,12 @@ class _MyPoolsState extends State<MyPools> {
       print('Deleting pool with id: $id'); // Debug log
       final url = '${APIConstants.baseUrl}/pool/$id';
       print('Delete URL: $url'); // Debug log
-      
-      final response = await http.delete(
-        Uri.parse(url),
-      ).timeout(Duration(seconds: 10)); // Add timeout
+
+      final response = await http
+          .delete(
+            Uri.parse(url),
+          )
+          .timeout(Duration(seconds: 10)); // Add timeout
 
       print('Delete response status: ${response.statusCode}'); // Debug log
       print('Delete response body: ${response.body}'); // Debug log
@@ -114,7 +116,7 @@ class _MyPoolsState extends State<MyPools> {
       if (response.statusCode == 200) {
         // Refresh the pools to get the updated data
         await fetchMyPools();
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Passenger removed successfully"),
@@ -123,7 +125,8 @@ class _MyPoolsState extends State<MyPools> {
           ),
         );
       } else {
-        throw Exception('Failed to remove passenger: Status ${response.statusCode}');
+        throw Exception(
+            'Failed to remove passenger: Status ${response.statusCode}');
       }
     } catch (e) {
       print('Remove passenger error: $e');
@@ -221,17 +224,20 @@ class _MyPoolsState extends State<MyPools> {
                             padding: EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               color: Colors.black,
-                              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                              borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(16)),
                             ),
                             child: Row(
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
-                                          Icon(Icons.location_on, color: Colors.white, size: 18),
+                                          Icon(Icons.location_on,
+                                              color: Colors.white, size: 18),
                                           SizedBox(width: 8),
                                           Text(
                                             '${pool['pickupLocation'] ?? 'N/A'}',
@@ -246,7 +252,8 @@ class _MyPoolsState extends State<MyPools> {
                                       SizedBox(height: 8),
                                       Row(
                                         children: [
-                                          Icon(Icons.location_on_outlined, color: Colors.white, size: 18),
+                                          Icon(Icons.location_on_outlined,
+                                              color: Colors.white, size: 18),
                                           SizedBox(width: 8),
                                           Text(
                                             '${pool['dropoffLocation'] ?? 'N/A'}',
@@ -291,7 +298,8 @@ class _MyPoolsState extends State<MyPools> {
                               children: [
                                 Row(
                                   children: [
-                                    Icon(Icons.access_time, size: 18, color: Colors.grey[700]),
+                                    Icon(Icons.access_time,
+                                        size: 18, color: Colors.grey[700]),
                                     SizedBox(width: 8),
                                     Text(
                                       'Time: ${pool['startTime'] ?? 'N/A'}',
@@ -300,13 +308,31 @@ class _MyPoolsState extends State<MyPools> {
                                         fontSize: 15,
                                       ),
                                     ),
+                                
+                                  ],
+                                ),
+
+                                     Row(
+                                  children: [
+                                    Icon(Icons.date_range,
+                                        size: 18, color: Colors.grey[700]),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Date: ${pool['date'] ?? 'N/A'}',
+                                      style: TextStyle(
+                                        color: Colors.grey[700],
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                
                                   ],
                                 ),
                                 if (pool['driver_phone'] != null) ...[
                                   SizedBox(height: 8),
                                   Row(
                                     children: [
-                                      Icon(Icons.phone, size: 18, color: Colors.grey[700]),
+                                      Icon(Icons.phone,
+                                          size: 18, color: Colors.grey[700]),
                                       SizedBox(width: 8),
                                       Text(
                                         'Driver: ${pool['driver_phone']}',
@@ -318,7 +344,8 @@ class _MyPoolsState extends State<MyPools> {
                                     ],
                                   ),
                                 ],
-                                if ((pool['passengers'] as List?)?.isNotEmpty ?? false) ...[
+                                if ((pool['passengers'] as List?)?.isNotEmpty ??
+                                    false) ...[
                                   SizedBox(height: 16),
                                   Text(
                                     'Passengers',
@@ -336,56 +363,80 @@ class _MyPoolsState extends State<MyPools> {
                                     ),
                                     child: Column(
                                       children: [
-                                        ...((pool['passengers'] as List?) ?? []).map((passenger) => Container(
-                                          padding: EdgeInsets.all(12),
-                                          decoration: BoxDecoration(
-                                            border: Border(
-                                              bottom: BorderSide(
-                                                color: Colors.grey.withOpacity(0.2),
-                                                width: 1,
-                                              ),
-                                            ),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Container(
-                                                padding: EdgeInsets.all(8),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.black.withOpacity(0.05),
-                                                  borderRadius: BorderRadius.circular(8),
-                                                ),
-                                                child: Icon(Icons.person, size: 20, color: Colors.black54),
-                                              ),
-                                              SizedBox(width: 12),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      '${passenger['phoneNumber'] ?? 'N/A'}',
-                                                      style: TextStyle(
-                                                        fontWeight: FontWeight.w500,
-                                                        fontSize: 15,
+                                        ...((pool['passengers'] as List?) ?? [])
+                                            .map((passenger) => Container(
+                                                  padding: EdgeInsets.all(12),
+                                                  decoration: BoxDecoration(
+                                                    border: Border(
+                                                      bottom: BorderSide(
+                                                        color: Colors.grey
+                                                            .withOpacity(0.2),
+                                                        width: 1,
                                                       ),
                                                     ),
-                                                    SizedBox(height: 4),
-                                                    Text(
-                                                      '${passenger['email'] ?? 'N/A'}',
-                                                      style: TextStyle(
-                                                        color: Colors.grey[600],
-                                                        fontSize: 14,
+                                                  ),
+                                                  child: Row(
+                                                    children: [
+                                                      Container(
+                                                        padding:
+                                                            EdgeInsets.all(8),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: Colors.black
+                                                              .withOpacity(
+                                                                  0.05),
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(8),
+                                                        ),
+                                                        child: Icon(
+                                                            Icons.person,
+                                                            size: 20,
+                                                            color:
+                                                                Colors.black54),
                                                       ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              IconButton(
-                                                icon: Icon(Icons.remove_circle, color: Colors.red),
-                                                onPressed: () => _removePassenger(pool["_id"], passenger['email']),
-                                              ),
-                                            ],
-                                          ),
-                                        )).toList(),
+                                                      SizedBox(width: 12),
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
+                                                            Text(
+                                                              '${passenger['phoneNumber'] ?? 'N/A'}',
+                                                              style: TextStyle(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w500,
+                                                                fontSize: 15,
+                                                              ),
+                                                            ),
+                                                            SizedBox(height: 4),
+                                                            Text(
+                                                              '${passenger['email'] ?? 'N/A'}',
+                                                              style: TextStyle(
+                                                                color: Colors
+                                                                    .grey[600],
+                                                                fontSize: 14,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      IconButton(
+                                                        icon: Icon(
+                                                            Icons.remove_circle,
+                                                            color: Colors.red),
+                                                        onPressed: () =>
+                                                            _removePassenger(
+                                                                pool["_id"],
+                                                                passenger[
+                                                                    'email']),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ))
+                                            .toList(),
                                       ],
                                     ),
                                   ),
@@ -396,15 +447,18 @@ class _MyPoolsState extends State<MyPools> {
                                   children: [
                                     TextButton.icon(
                                       onPressed: () => _deletePool(pool["_id"]),
-                                      icon: Icon(Icons.delete_outline, color: Colors.red),
+                                      icon: Icon(Icons.delete_outline,
+                                          color: Colors.red),
                                       label: Text(
                                         'Delete Pool',
                                         style: TextStyle(color: Colors.red),
                                       ),
                                       style: TextButton.styleFrom(
-                                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 16, vertical: 8),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
                                         ),
                                       ),
                                     ),

@@ -38,8 +38,24 @@ class _RidePageState extends State<RidePage> {
   bool _isLoading = false;
   List<dynamic> _joinedPools = [];
 
-  final List<String> _sourcelocation = ['Tada', 'IIITS', 'Sullurupeta'];
-  final List<String> _destinationlocation = ['Tada', 'IIITS', 'Sullurupeta'];
+  final List<String> _sourcelocation = [
+    'IIITS',
+    'Tada',
+    'Sullurupeta',
+    'Gummidipoondi',
+    'Tirupati',
+    'Chennai',
+    'Arambakkam'
+  ];
+  final List<String> _destinationlocation = [
+    'IIITS',
+    'Tada',
+    'Sullurupeta',
+    'Gummidipoondi',
+    'Tirupati',
+    'Chennai',
+    'Arambakkam'
+  ];
 
   final List<String> _hours =
       List.generate(12, (index) => (index + 1).toString().padLeft(2, '0'));
@@ -189,11 +205,165 @@ class _RidePageState extends State<RidePage> {
     }
 
     return DateTime(
-      int.parse(dateParts[0]),  // year
-      int.parse(dateParts[1]),  // month
-      int.parse(dateParts[2]),  // day
+      int.parse(dateParts[0]), // year
+      int.parse(dateParts[1]), // month
+      int.parse(dateParts[2]), // day
       hour,
       minute,
+    );
+  }
+
+  void _showLogoutModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "Account Options",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 15),
+
+              // Switch Account Option
+              ListTile(
+                leading: Icon(Icons.switch_account, color: Colors.blue),
+                title: Text("Switch Account"),
+                onTap: () {
+                  Navigator.pop(context);
+                  _switchAccount(context);
+                },
+              ),
+
+              Divider(),
+
+              // Logout Option
+              ListTile(
+                leading: Icon(Icons.logout, color: Colors.red),
+                title: Text("Log Out"),
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmLogout(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+void _switchAccount(BuildContext context) async {
+  showDialog(
+    context: context,
+    builder: (context) {
+      TextEditingController emailController = TextEditingController();
+      return AlertDialog(
+        title: Text("Switch Account"),
+        content: TextField(
+          controller: emailController,
+          keyboardType: TextInputType.emailAddress,
+          decoration: InputDecoration(
+            labelText: "Enter new email",
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () async {
+              String newEmail = emailController.text.trim();
+              if (newEmail.isNotEmpty) {
+                try {
+                  final url = '${APIConstants.baseUrl}/emails/$newEmail'; // Assuming the endpoint to check email exists
+                  final response = await http.get(Uri.parse(url));
+
+                  if (response.statusCode == 200) {
+                    // Email exists, continue with your logic
+                    print("Email found: $newEmail");
+                    Navigator.pop(context);
+                  } else if (response.statusCode == 404) {
+                    // Email does not exist, show error message
+                    showErrorDialog(context, "No account found with this email. Please create a new account.");
+                  } else {
+                    // Handle other unexpected status codes
+                    showErrorDialog(context, "An error occurred. Please try again.");
+                  }
+                } catch (e) {
+                  // Handle network or other errors
+                  showErrorDialog(context, "An error occurred. Please check your connection and try again.");
+                }
+              }
+            },
+            child: Text("Switch"),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+void showErrorDialog(BuildContext context, String message) {
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: Text("Error"),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("OK"),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+
+  void _confirmLogout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Confirm Logout"),
+          content: Text(
+              "Are you sure you want to log out? This will remove your account from the app."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context), // Close the dialog
+              child: Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () async {
+                // Delete the token from secure storage
+                await secureStorage.delete(key: 'jwt_token');
+                print("User logged out and account deleted.");
+
+                // Close the dialog
+                Navigator.pop(context);
+
+                // Navigate to SignUpScreen
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => SignUpScreen(),
+                  ),
+                );
+              },
+              child: Text("Log Out", style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -205,7 +375,7 @@ class _RidePageState extends State<RidePage> {
         actions: [
           IconButton(
             icon: Icon(Icons.exit_to_app),
-            onPressed: () => _logOut(context),
+            onPressed: () => _showLogoutModal(context),
           ),
         ],
       ),
@@ -248,8 +418,12 @@ class _RidePageState extends State<RidePage> {
                         joinedPools: _joinedPools,
                         userEmail: widget.email,
                         userPhone: widget.phoneNumber,
-                        starting: _selectedSource?.isEmpty ?? true ? null : _selectedSource,
-                        destination: _selectedDestination?.isEmpty ?? true ? null : _selectedDestination,
+                        starting: _selectedSource?.isEmpty ?? true
+                            ? null
+                            : _selectedSource,
+                        destination: _selectedDestination?.isEmpty ?? true
+                            ? null
+                            : _selectedDestination,
                       ),
                     ),
                   );
@@ -422,13 +596,17 @@ class _RidePageState extends State<RidePage> {
                                 return;
                               }
 
-                              if (_hasRideWithin30Minutes(_selectedSource, _selectedDestination)) {
+                              if (_hasRideWithin30Minutes(
+                                  _selectedSource, _selectedDestination)) {
                                 // Find the specific ride within 30 minutes
                                 var nearbyRide = _joinedPools.firstWhere(
                                   (pool) {
-                                    final dateTimeString = '${pool['date']} ${pool['startTime']}';
-                                    final poolDateTime = _parsePoolDateTime(dateTimeString);
-                                    final timeDifference = poolDateTime.difference(DateTime.now());
+                                    final dateTimeString =
+                                        '${pool['date']} ${pool['startTime']}';
+                                    final poolDateTime =
+                                        _parsePoolDateTime(dateTimeString);
+                                    final timeDifference =
+                                        poolDateTime.difference(DateTime.now());
                                     return timeDifference.inMinutes.abs() <= 30;
                                   },
                                 );
@@ -436,8 +614,7 @@ class _RidePageState extends State<RidePage> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      'You have an existing ride at ${nearbyRide['startTime']} on ${nearbyRide['date']}. You cannot book a new ride within 30 minutes of an existing ride.'
-                                    ),
+                                        'You have an existing ride at ${nearbyRide['startTime']} on ${nearbyRide['date']}. You cannot book a new ride within 30 minutes of an existing ride.'),
                                     backgroundColor: Colors.orange,
                                   ),
                                 );
