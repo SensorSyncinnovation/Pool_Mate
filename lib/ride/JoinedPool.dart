@@ -8,6 +8,7 @@ class JoinedPoolsPage extends StatefulWidget {
   final String userPhone;
   final String? starting;
   final String? destination;
+  final List<dynamic>? joinedPools;
 
   const JoinedPoolsPage({
     Key? key,
@@ -15,13 +16,15 @@ class JoinedPoolsPage extends StatefulWidget {
     required this.userPhone,
     this.starting,
     this.destination,
+    this.joinedPools,
   }) : super(key: key);
 
   @override
   _JoinedPoolsPageState createState() => _JoinedPoolsPageState();
 }
 
-class _JoinedPoolsPageState extends State<JoinedPoolsPage> with SingleTickerProviderStateMixin {
+class _JoinedPoolsPageState extends State<JoinedPoolsPage>
+    with SingleTickerProviderStateMixin {
   List<dynamic> _joinedPools = [];
   List<dynamic> _history = [];
   bool _isLoading = true;
@@ -31,7 +34,11 @@ class _JoinedPoolsPageState extends State<JoinedPoolsPage> with SingleTickerProv
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _fetchJoinedPoolsAndHistory();
+    if (widget.joinedPools != null) {
+      _joinedPools = widget.joinedPools!;
+    } else {
+      _fetchJoinedPoolsAndHistory();
+    }
   }
 
   @override
@@ -42,10 +49,11 @@ class _JoinedPoolsPageState extends State<JoinedPoolsPage> with SingleTickerProv
 
   Future<void> _fetchJoinedPoolsAndHistory() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final response = await http.get(
-        Uri.parse('${APIConstants.baseUrl}/user/joined-pools/${widget.userEmail}'),
+        Uri.parse(
+            '${APIConstants.baseUrl}/user/joined-pools/${widget.userEmail}'),
       );
 
       if (response.statusCode == 200) {
@@ -95,8 +103,10 @@ class _JoinedPoolsPageState extends State<JoinedPoolsPage> with SingleTickerProv
   }
 
   Widget _buildRideCard(dynamic ride, bool isHistory) {
-    final DateTime rideDate = DateTime.parse(ride['startTime'] ?? DateTime.now().toIso8601String());
-    final String formattedDate = '${rideDate.day}/${rideDate.month}/${rideDate.year} ${rideDate.hour}:${rideDate.minute}';
+    final DateTime rideDate =
+        DateTime.parse(ride['startTime'] ?? DateTime.now().toIso8601String());
+    final String formattedDate =
+        '${rideDate.day}/${rideDate.month}/${rideDate.year} ${rideDate.hour}:${rideDate.minute}';
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -144,15 +154,18 @@ class _JoinedPoolsPageState extends State<JoinedPoolsPage> with SingleTickerProv
             const Divider(height: 24),
             _buildDetailRow(Icons.person, 'Driver', ride['driver'] ?? 'N/A'),
             _buildDetailRow(Icons.access_time, 'Date & Time', formattedDate),
-            _buildDetailRow(Icons.attach_money, 'Cost', '₹${ride['cost'] ?? 'N/A'}'),
+            _buildDetailRow(
+                Icons.attach_money, 'Cost', '₹${ride['cost'] ?? 'N/A'}'),
             if (!isHistory) ...[
               _buildDetailRow(
                 Icons.group,
                 'Passengers',
                 '${ride['passengers']?.length ?? 0}/${(ride['seats_available'] ?? 0) + (ride['passengers']?.length ?? 0)}',
               ),
-              _buildDetailRow(Icons.phone, 'Driver Contact', ride['driver_phone'] ?? 'N/A'),
-              _buildDetailRow(Icons.info_outline, 'Status', ride['status'] ?? 'Active'),
+              _buildDetailRow(
+                  Icons.phone, 'Driver Contact', ride['driver_phone'] ?? 'N/A'),
+              _buildDetailRow(
+                  Icons.info_outline, 'Status', ride['status'] ?? 'Active'),
             ],
           ],
         ),
